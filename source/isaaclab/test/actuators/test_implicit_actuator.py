@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (c) 2025-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+=======
+# Copyright (c) 2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+>>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -12,9 +16,16 @@ simulation_app = AppLauncher(headless=HEADLESS).app
 
 """Rest of imports follows"""
 
+<<<<<<< HEAD
 import pytest
 import torch
 
+=======
+import torch
+
+import pytest
+
+>>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.sim import build_simulation_context
 

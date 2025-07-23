@@ -2,6 +2,7 @@ Changelog
 ---------
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 0.54.3 (2026-02-04)
 ~~~~~~~~~~~~~~~~~~~
 
@@ -1064,15 +1065,30 @@ Changed
 * Changed the way clipping is handled for :class:`~isaaclab.actuator.DCMotor` for torque-speed points in when in
   negative power regions.
 
+=======
+0.41.1 (2025-07-22)
+~~~~~~~~~~~~~~~~~~~
+
+>>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 Added
 ^^^^^
 
 * Added unit tests for :class:`~isaaclab.actuator.ImplicitActuator`, :class:`~isaaclab.actuator.IdealPDActuator`,
   and :class:`~isaaclab.actuator.DCMotor` independent of :class:`~isaaclab.assets.Articulation`
 
+<<<<<<< HEAD
 
 0.43.0 (2025-07-21)
 =======
+=======
+Changed
+^^^^^^^
+
+* Changed the way clipping is handled for :class:`~isaaclab.actuator.DCMotor` for torque-speed points in when in
+  negative power regions.
+
+
+>>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 0.41.0 (2025-07-21)
 >>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 ~~~~~~~~~~~~~~~~~~~
