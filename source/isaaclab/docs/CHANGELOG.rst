@@ -1,6 +1,7 @@
 Changelog
 ---------
 
+<<<<<<< HEAD
 0.54.3 (2026-02-04)
 ~~~~~~~~~~~~~~~~~~~
 
@@ -1071,6 +1072,9 @@ Added
 
 
 0.43.0 (2025-07-21)
+=======
+0.41.0 (2025-07-21)
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 ~~~~~~~~~~~~~~~~~~~
 
 Changed
@@ -1082,7 +1086,11 @@ Changed
   torch version, we are now overwriting the torch installation step in isaaclab.sh when running ``./isaaclab.sh -i``.
 
 
+<<<<<<< HEAD
 0.42.26 (2025-06-29)
+=======
+0.40.23 (2025-06-29)
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 ~~~~~~~~~~~~~~~~~~~~
 
 Added

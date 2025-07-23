@@ -27,18 +27,42 @@ Quick Installation Guide
 There are many ways to :ref:`install <isaaclab-installation-root>` Isaac Lab, but for the purposes of this quickstart guide, we will follow the
 pip install route using virtual environments.
 
+<<<<<<< HEAD
 To begin, we first define our virtual environment.
 
+=======
+
+.. note::
+
+   If you are using Ubuntu 20.04, you will need to follow the :ref:`Binary Installation Guide <isaaclab-binaries-installation>` instead of the pip install route described below.
+
+
+To begin, we first define our virtual environment. We recommend using `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ to create a virtual environment.
+
+
+.. code-block:: bash
+
+    # create a virtual environment named env_isaaclab with python3.10
+    conda create -n env_isaaclab python=3.10
+    # activate the virtual environment
+    conda activate env_isaaclab
+
+Next, we need to install the CUDA-enabled version of PyTorch 2.7.0. This step is optional for Linux, but required for Windows to ensure a CUDA-compatible version of PyTorch is installed.
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 .. tab-set::
 
    .. tab-item:: conda
 
       .. code-block:: bash
 
+<<<<<<< HEAD
          # create a virtual environment named env_isaaclab with python3.11 and pip
          conda create -n env_isaaclab python=3.11
          # activate the virtual environment
          conda activate env_isaaclab
+=======
+            pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 
    .. tab-item:: uv (experimental)
 
@@ -72,6 +96,10 @@ Next, install a CUDA-enabled PyTorch 2.7.0 build.
 
       pip install -U torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
 
+<<<<<<< HEAD
+=======
+            pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 
 Before we can install Isaac Sim, we need to make sure pip is updated.  To update pip, run
 

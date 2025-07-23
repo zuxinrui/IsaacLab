@@ -25,7 +25,65 @@ Installing dependencies
    In case you used UV to create your virtual environment, please replace ``pip`` with ``uv pip``
    in the following commands.
 
+<<<<<<< HEAD
 -  Install the Isaac Lab packages along with Isaac Sim:
+=======
+            conda create -n env_isaaclab python=3.10
+            conda activate env_isaaclab
+
+      .. tab-item:: venv environment
+
+         .. tab-set::
+            :sync-group: os
+
+            .. tab-item:: :icon:`fa-brands fa-linux` Linux
+               :sync: linux
+
+               .. code-block:: bash
+
+                  # create a virtual environment named env_isaaclab with python3.10
+                  python3.10 -m venv env_isaaclab
+                  # activate the virtual environment
+                  source env_isaaclab/bin/activate
+
+            .. tab-item:: :icon:`fa-brands fa-windows` Windows
+               :sync: windows
+
+               .. code-block:: batch
+
+                  # create a virtual environment named env_isaaclab with python3.10
+                  python3.10 -m venv env_isaaclab
+                  # activate the virtual environment
+                  env_isaaclab\Scripts\activate
+
+
+-  Next, install a CUDA-enabled PyTorch 2.7.0 build. This step is optional for Linux, but required for Windows to ensure a CUDA-compatible version of PyTorch is installed.
+
+   .. code-block:: bash
+
+      pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+
+-  Before installing Isaac Lab, ensure the latest pip version is installed. To update pip, run
+
+   .. tab-set::
+      :sync-group: os
+
+      .. tab-item:: :icon:`fa-brands fa-linux` Linux
+         :sync: linux
+
+         .. code-block:: bash
+
+            pip install --upgrade pip
+
+      .. tab-item:: :icon:`fa-brands fa-windows` Windows
+         :sync: windows
+
+         .. code-block:: batch
+
+            python -m pip install --upgrade pip
+
+-  Then, install the Isaac Lab packages, this will also install Isaac Sim.
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 
    .. code-block:: none
 
@@ -33,6 +91,7 @@ Installing dependencies
 
 -  Install a CUDA-enabled PyTorch 2.7.0 build for CUDA 12.8 that matches your system architecture:
 
+<<<<<<< HEAD
    .. tab-set::
       :sync-group: pip-platform
 
@@ -47,6 +106,10 @@ Installing dependencies
          :sync: windows-x86_64
 
          .. code-block:: bash
+=======
+Verifying the Isaac Sim installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 
             pip install -U torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
 
