@@ -194,13 +194,15 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
             joint_pos_target = joint_pos_target.clamp_(
                 robot.data.soft_joint_pos_limits[..., 0], robot.data.soft_joint_pos_limits[..., 1]
             )
-            # print(f"[INFO]: Applying action to {robot.name} with joint positions: {joint_pos_target.tolist()}")
             # apply action to the robot
             robot.set_joint_position_target(joint_pos_target)
             # write data to sim
             robot.write_data_to_sim()
         # perform step
-        sim.step()
+        for i in range(200):
+            # step the simulation
+            sim.step()
+        # sim.step()
         # update sim-time
         sim_time += sim_dt
         count += 1
