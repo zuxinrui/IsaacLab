@@ -43,7 +43,7 @@ from isaaclab.actuators import actuator_pd
 from isaaclab.terrains.terrain_importer_cfg import TerrainImporterCfg
 from isaaclab.sim.spawners.materials import RigidBodyMaterialCfg
 
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 
 ##
 # Pre-defined configs
@@ -92,10 +92,19 @@ class LynxSceneCfg(InteractiveSceneCfg):
                     "joint_5": 0.0,
                     "joint_6": 0.0,
                 },
+                # joint_pos={
+                #     "shoulder_pan_joint": 0.0,
+                #     "shoulder_lift_joint": -1.712,
+                #     "elbow_joint": 1.712,
+                #     "wrist_1_joint": 0.0,
+                #     "wrist_2_joint": 0.0,
+                #     "wrist_3_joint": 0.0,
+                # },
                 # pos=(0.0, 0.0, 0.8),
                 ),
             spawn=UsdFileCfg(
                 usd_path="source/isaaclab_assets/data/Robots/Lynx/lynx-isaacsim2-urdf.usd",  # {ISAAC_NUCLEUS_DIR} / source/isaaclab_assets/data/
+                # usd_path=f"{ISAACLAB_NUCLEUS_DIR}/Robots/UniversalRobots/UR10/ur10_instanceable.usd",
                 scale=(1.0, 1.0, 1.0),
                 rigid_props=sim_utils.RigidBodyPropertiesCfg(
                     disable_gravity=False,
@@ -107,27 +116,13 @@ class LynxSceneCfg(InteractiveSceneCfg):
                 activate_contact_sensors=False,
             ),
             actuators={
-                "lynx_arm": ImplicitActuatorCfg(
-                    joint_names_expr=["joint_[1-6]"],
-                    velocity_limit=100.0,
-                    effort_limit=87.0,
-                    stiffness=800.0,
-                    damping=40.0,
+                "arm": ImplicitActuatorCfg(
+                    joint_names_expr=[".*"],
+                    velocity_limit=5000.0,
+                    effort_limit=5000.0,
+                    stiffness=100000.0,
+                    damping=10000.0,
                 ),
-                # "joint2_joint": ImplicitActuatorCfg(
-                #     joint_names_expr=["joint2_joint"],
-                #     velocity_limit=100.0,
-                #     effort_limit=87.0,
-                #     stiffness=800.0,
-                #     damping=40.0,
-                # ),
-                # "joint3_joint": ImplicitActuatorCfg(
-                #     joint_names_expr=["joint3_joint"],
-                #     velocity_limit=100.0,
-                #     effort_limit=87.0,
-                #     stiffness=800.0,
-                #     damping=40.0,
-                # ),
             },
         )
 
@@ -155,7 +150,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
             continue
         # Else, perform simulation step
         # generate random joint position targets
-        joint_pos_target = robot.data.default_joint_pos + torch.randn_like(robot.data.joint_pos) * 0.1
+        joint_pos_target = robot.data.default_joint_pos + torch.randn_like(robot.data.joint_pos) * 0.9
         # clamp the targets within soft joint limits
         joint_pos_target.clamp_(robot.data.soft_joint_pos_limits[..., 0], robot.data.soft_joint_pos_limits[..., 1])
         # set the joint position targets
@@ -163,7 +158,10 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         # write data to simulation
         robot.write_data_to_sim()
         # step the simulation
-        sim.step()
+        for _ in range(200):  # run 200 steps to simulate 1 second at 200Hz
+            # step the simulation
+            sim.step()
+        # sim.step()
 
 
 if __name__ == "__main__":

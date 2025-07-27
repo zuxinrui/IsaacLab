@@ -2,3 +2,10 @@
 
 ./isaaclab.sh -p scripts/tools/convert_mjcf.py ./scripts/lynx/lynx_orth.xml source/isaaclab_assets/data/Robots/Lynx/lynx-fixed.usd --fix-base --import-sites --make-instanceable
 
+# THe USD file needs to be manually imported into the original isaacsim app and imported as a new asset, not the reference asset:
+# 1. Open the original isaacsim app:
+# 2. Import the USD file as a new asset.
+# 3. Change the articulation root from root_joint to the root prim (just the name of the robot)
+# 4. Save the asset.
+
+# the final usd file for lynx urdf version: lynx-isaacsim2-urdf.usd
