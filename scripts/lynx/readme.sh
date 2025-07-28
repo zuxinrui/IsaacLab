@@ -9,3 +9,9 @@
 # 4. Save the asset.
 
 # the final usd file for lynx urdf version: lynx-isaacsim2-urdf.usd
+
+# Distributed training via rsl_rl:
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v0 --distributed --headless --num_envs 16384
+
+
+
