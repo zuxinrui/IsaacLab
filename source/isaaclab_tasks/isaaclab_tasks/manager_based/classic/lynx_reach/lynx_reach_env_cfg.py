@@ -178,7 +178,7 @@ class LynxReachEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the Lynx reach environment."""
 
     # Scene settings
-    scene: LynxReachSceneCfg = LynxReachSceneCfg(num_envs=64, env_spacing=2.5)
+    scene: LynxReachSceneCfg = LynxReachSceneCfg(num_envs=512, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -198,4 +198,4 @@ class LynxReachEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.lookat = (0.0, 0.0, 1.0)
         # simulation settings
         self.sim.dt = 1 / 120
-        self.sim.render_interval = self.decimation
+        # self.sim.render_interval = self.decimation

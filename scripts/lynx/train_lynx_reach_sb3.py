@@ -81,7 +81,7 @@ def main():
     model = PPO("MlpPolicy", vec_env, verbose=1, device=args_cli.device)
 
     # Train the agent
-    total_timesteps = 1_000_000
+    total_timesteps = 10_000_000
     model.learn(total_timesteps=total_timesteps)
 
     # Save the trained model
