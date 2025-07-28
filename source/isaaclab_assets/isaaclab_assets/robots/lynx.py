@@ -63,9 +63,10 @@ class LynxArmCfg(ArticulationCfg):
     }
 
     # end-effector link name
-    end_effector_link_name: str = "ee_cylinder"
+    end_effector_link_name: str = "tool_link"
     # end-effector site name
     end_effector_site_name: str = "end_effector"
 
 LYNX_CFG = LynxArmCfg()
 LYNX_HD_CFG = LynxArmCfg()
+

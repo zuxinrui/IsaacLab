@@ -84,13 +84,23 @@ class LynxSceneCfg(InteractiveSceneCfg):
                                       # For the Lynx robot, ensure 'source/isaaclab_assets/data/Robots/Lynx/lynx.usd'
                                       # has ArticulationRootAPI applied to its root prim.  {ENV_REGEX_NS}
             init_state=ArticulationCfg.InitialStateCfg(
+                # urdf robot:
+                # joint_pos={
+                #     "joint_1": 0.0,
+                #     "joint_2": 0.0,
+                #     "joint_3": 0.0,
+                #     "joint_4": 0.0,
+                #     "joint_5": 0.0,
+                #     "joint_6": 0.0,
+                # },
+                # mjcf robot:
                 joint_pos={
-                    "joint_1": 0.0,
-                    "joint_2": 0.0,
-                    "joint_3": 0.0,
-                    "joint_4": 0.0,
-                    "joint_5": 0.0,
-                    "joint_6": 0.0,
+                    "joint1_joint": 0.0,
+                    "joint2_joint": 0.0,
+                    "joint3_joint": 0.0,
+                    "joint4_joint": 0.0,
+                    "joint5_joint": 0.0,
+                    "joint6_joint": 0.0,
                 },
                 # joint_pos={
                 #     "shoulder_pan_joint": 0.0,
@@ -103,7 +113,7 @@ class LynxSceneCfg(InteractiveSceneCfg):
                 # pos=(0.0, 0.0, 0.8),
                 ),
             spawn=UsdFileCfg(
-                usd_path="source/isaaclab_assets/data/Robots/Lynx/lynx-isaacsim2-urdf.usd",  # {ISAAC_NUCLEUS_DIR} / source/isaaclab_assets/data/
+                usd_path="source/isaaclab_assets/data/Robots/Lynx/lynx-mjcf.usd",  # {ISAAC_NUCLEUS_DIR} / source/isaaclab_assets/data/
                 # usd_path=f"{ISAACLAB_NUCLEUS_DIR}/Robots/UniversalRobots/UR10/ur10_instanceable.usd",
                 scale=(1.0, 1.0, 1.0),
                 rigid_props=sim_utils.RigidBodyPropertiesCfg(
