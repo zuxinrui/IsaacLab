@@ -161,6 +161,8 @@ class VisualizationMarkers:
         self._instancer_manager.GetProtoIndicesAttr().Set(list(range(self.num_prototypes)))
         self._instancer_manager.GetPositionsAttr().Set([Gf.Vec3f(0.0)] * self.num_prototypes)
         self._count = self.num_prototypes
+        # print(f"DEBUG: VisualizationMarkers initialized for prim_path: {self.prim_path}, num_prototypes: {self.num_prototypes}")
+        # print(f"DEBUG: VisualizationMarkers initialized for prim_path: {self.prim_path}, num_prototypes: {self.num_prototypes}")
 
     def __str__(self) -> str:
         """Return: A string representation of the class."""
@@ -311,6 +313,7 @@ class VisualizationMarkers:
             # update number of markers
             num_markers = scales.shape[0]
         # -- status
+        # print(f"DEBUG: visualize called for prim_path: {self.prim_path}, marker_indices: {marker_indices}, num_markers: {num_markers}, self._count: {self._count}, num_prototypes: {self.num_prototypes}")
         if marker_indices is not None or num_markers != self._count:
             # apply marker indices
             if marker_indices is not None:

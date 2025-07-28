@@ -24,3 +24,4 @@ from .shadow_hand import *
 from .spot import *
 from .unitree import *
 from .universal_robots import *
+from .lynx import *  # noqa: F401, F403

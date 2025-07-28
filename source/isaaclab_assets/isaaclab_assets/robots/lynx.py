@@ -36,7 +36,7 @@ class LynxArmCfg(ArticulationCfg):
     )
 
     init_state: ArticulationCfg.InitialStateCfg = ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.80000000000000004),  # Base position from lynx_orth.xml
+        pos=(0.0, 0.0, 0.0),  # Base position from lynx_orth.xml
         joint_pos={
             "joint_1": 0.0,
             "joint_2": 0.0,
@@ -66,3 +66,6 @@ class LynxArmCfg(ArticulationCfg):
     end_effector_link_name: str = "ee_cylinder"
     # end-effector site name
     end_effector_site_name: str = "end_effector"
+
+LYNX_CFG = LynxArmCfg()
+LYNX_HD_CFG = LynxArmCfg()

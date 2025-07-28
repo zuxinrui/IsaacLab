@@ -4,11 +4,11 @@ from . import agents
 
 
 gym.register(
-    id="Isaac-lynx_reach-Lynx-v0",
+    id="Isaac-Reach-Lynx-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.lynx_reach_env_cfg:LynxReachEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:LynxReachEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LynxReachRslRlOnPolicyRunnerCfg",
     },
 )
