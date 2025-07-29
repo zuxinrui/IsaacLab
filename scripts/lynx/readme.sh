@@ -13,5 +13,6 @@
 # Distributed training via rsl_rl:
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v0 --distributed --headless --num_envs 16384
 
-
+# also works for 4070 ti super (16GB VRAM), the observation excludes joint velocities:
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v1 --distributed --headless --num_envs 16384
 
