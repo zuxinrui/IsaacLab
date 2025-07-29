@@ -11,7 +11,7 @@ from isaaclab.utils import configclass
 ##
 # USD Reference
 ##
-_USD_PATH = "source/isaaclab_assets/data/Robots/Lynx/lynx-isaacsim-materials-urdf.usd"
+_USD_PATH = "source/isaaclab_assets/data/Robots/Lynx/lynx-vu-urdf.usd"
 
 
 ##
