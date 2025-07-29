@@ -3,12 +3,19 @@ Changelog
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 0.54.3 (2026-02-04)
 ~~~~~~~~~~~~~~~~~~~
+=======
+
+0.41.2 (2025-07-28)
+~~~~~~~~~~~~~~~~~~~~
+>>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
 
 Fixed
 ^^^^^
 
+<<<<<<< HEAD
 * Fixed :class:`~isaaclab.envs.mdp.actions.JointPositionToLimitsAction` and
   :class:`~isaaclab.envs.mdp.actions.EMAJointPositionToLimitsAction` ignoring
   ``preserve_order=True`` when the number of specified joints matches the total
@@ -27,6 +34,13 @@ Changed
 
 
 0.54.1 (2026-01-25)
+=======
+* Fixed :meth:`isaaclab.scene.reset_to` to properly accept None as valid argument.
+* Added tests to verify that argument types.
+
+
+0.41.1 (2025-07-22)
+>>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
 ~~~~~~~~~~~~~~~~~~~
 
 Added
@@ -1123,8 +1137,12 @@ Added
 Added
 ^^^^^
 
+<<<<<<< HEAD
 * Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered
   contact forces in the world frame.
+=======
+* Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered contact forces in the world frame.
+>>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
 
 
 0.42.24 (2025-06-25)

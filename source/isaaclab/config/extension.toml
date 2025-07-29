@@ -3,6 +3,7 @@
 # Note: Semantic Versioning is used: https://semver.org/
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.54.3"
 =======
 version = "0.41.0"
@@ -10,6 +11,9 @@ version = "0.41.0"
 =======
 version = "0.41.1"
 >>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
+=======
+version = "0.41.2"
+>>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
 
 # Description
 title = "Isaac Lab framework for Robot Learning"
