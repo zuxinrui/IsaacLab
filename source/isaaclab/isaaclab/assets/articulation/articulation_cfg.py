@@ -47,9 +47,12 @@ class ArticulationCfg(AssetBaseCfg):
     contains two articulations, one at `/robot1` and another at `/robot2`, and you want to use `robot2`,
     then you should set this to `/robot2`.
 
+<<<<<<< HEAD
     The path must start with a slash (`/`).
     """
 
+=======
+>>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
     init_state: InitialStateCfg = InitialStateCfg()
     """Initial state of the articulated object. Defaults to identity pose with zero velocity and zero joint state."""
 

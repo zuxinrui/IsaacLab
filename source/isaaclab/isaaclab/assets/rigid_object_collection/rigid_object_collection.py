@@ -534,6 +534,17 @@ class RigidObjectCollection(AssetBase):
                 # example of disabling external wrench
                 asset.set_external_force_and_torque(forces=torch.zeros(0, 0, 3), torques=torch.zeros(0, 0, 3))
 
+        .. caution::
+            If the function is called consecutively with and with different values for ``is_global``, then the
+            all the external wrenches will be applied in the frame specified by the last call.
+
+            .. code-block:: python
+                # example of setting external wrench in the global frame
+                asset.set_external_force_and_torque(forces=torch.ones(1, 1, 3), env_ids=[0], is_global=True)
+                # example of setting external wrench in the link frame
+                asset.set_external_force_and_torque(forces=torch.ones(1, 1, 3), env_ids=[1], is_global=False)
+                # Both environments will have the external wrenches applied in the link frame
+
         .. note::
             This function does not apply the external wrench to the simulation. It only fills the buffers with
             the desired values. To apply the external wrench, call the :meth:`write_data_to_sim` function
@@ -566,6 +577,7 @@ class RigidObjectCollection(AssetBase):
             env_ids = wp.from_torch(env_ids.to(torch.int32), dtype=wp.int32)
         # -- object_ids
         if object_ids is None:
+<<<<<<< HEAD
             object_ids = self._ALL_OBJ_INDICES_WP
         elif isinstance(object_ids, slice):
             object_ids = wp.from_torch(
@@ -573,6 +585,23 @@ class RigidObjectCollection(AssetBase):
             )
         elif not isinstance(object_ids, torch.Tensor):
             object_ids = wp.array(object_ids, dtype=wp.int32, device=self.device)
+=======
+            object_ids = self._ALL_OBJ_INDICES
+        # set into internal buffers
+        self._external_force_b[env_ids[:, None], object_ids] = forces
+        self._external_torque_b[env_ids[:, None], object_ids] = torques
+
+        if is_global != self._use_global_wrench_frame:
+            omni.log.warn(
+                f"The external wrench frame has been changed from {self._use_global_wrench_frame} to {is_global}. This"
+                " may lead to unexpected behavior."
+            )
+            self._use_global_wrench_frame = is_global
+
+        if positions is not None:
+            self.uses_external_wrench_positions = True
+            self._external_wrench_positions_b[env_ids[:, None], object_ids] = positions
+>>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
         else:
             object_ids = wp.from_torch(object_ids.to(torch.int32), dtype=wp.int32)
 
@@ -700,9 +729,19 @@ class RigidObjectCollection(AssetBase):
         self._ALL_ENV_INDICES_WP = wp.from_torch(self._ALL_ENV_INDICES.to(torch.int32), dtype=wp.int32)
         self._ALL_OBJ_INDICES_WP = wp.from_torch(self._ALL_OBJ_INDICES.to(torch.int32), dtype=wp.int32)
 
+<<<<<<< HEAD
         # external wrench composer
         self._instantaneous_wrench_composer = WrenchComposer(self)
         self._permanent_wrench_composer = WrenchComposer(self)
+=======
+        # external forces and torques
+        self.has_external_wrench = False
+        self._external_force_b = torch.zeros((self.num_instances, self.num_objects, 3), device=self.device)
+        self._external_torque_b = torch.zeros_like(self._external_force_b)
+        self._external_wrench_positions_b = torch.zeros_like(self._external_force_b)
+        self.uses_external_wrench_positions = False
+        self._use_global_wrench_frame = False
+>>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
         # set information about rigid body into data
         self._data.object_names = self.object_names
