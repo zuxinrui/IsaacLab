@@ -93,7 +93,7 @@ class ActionsCfg:
 
 
 @configclass
-class ObservationsCfg:
+class ObservationsWithoutVelocityCfg:
     """Observation specifications for the MDP."""
 
     @configclass
@@ -105,6 +105,28 @@ class ObservationsCfg:
         # joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "ee_pose"})
         actions = ObsTerm(func=mdp.last_action)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+
+
+@configclass
+class ObservationsWithoutVelActCfg:
+    """Observation specifications for the MDP."""
+
+    @configclass
+    class PolicyCfg(ObsGroup):
+        """Observations for policy group."""
+
+        # observation terms (order preserved)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        # joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "ee_pose"})
+        # actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -190,7 +212,7 @@ class ReducedReachEnvCfg(ManagerBasedRLEnvCfg):
     # Scene settings
     scene: ReachSceneCfg = ReachSceneCfg(num_envs=4096, env_spacing=2.5)
     # Basic settings
-    observations: ObservationsCfg = ObservationsCfg()
+    observations: ObservationsWithoutVelocityCfg = ObservationsWithoutVelocityCfg()
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
     # MDP settings
@@ -235,6 +257,68 @@ class ReducedLynxReachEnvCfg(ReducedReachEnvCfg):
 
 @configclass
 class ReducedLynxReachEnvCfg_PLAY(ReducedLynxReachEnvCfg):
+    def __post_init__(self):
+        # post init of parent
+        super().__post_init__()
+        # make a smaller scene for play
+        self.scene.num_envs = 50
+        self.scene.env_spacing = 2.5
+        # disable randomization for play
+        self.observations.policy.enable_corruption = False
+
+
+@configclass
+class ReducedLoopReachEnvCfg(ManagerBasedRLEnvCfg):
+    """Configuration for the reach end-effector pose tracking environment."""
+
+    # Scene settings
+    scene: ReachSceneCfg = ReachSceneCfg(num_envs=4096, env_spacing=2.5)
+    # Basic settings
+    observations: ObservationsWithoutVelActCfg = ObservationsWithoutVelActCfg()
+    actions: ActionsCfg = ActionsCfg()
+    commands: CommandsCfg = CommandsCfg()
+    # MDP settings
+    rewards: RewardsCfg = RewardsCfg()
+    terminations: TerminationsCfg = TerminationsCfg()
+    events: EventCfg = EventCfg()
+    curriculum: CurriculumCfg = CurriculumCfg()
+
+    def __post_init__(self):
+        """Post initialization."""
+        # general settings
+        self.decimation = 2
+        self.sim.render_interval = self.decimation
+        self.episode_length_s = 12.0
+        self.viewer.eye = (3.5, 3.5, 3.5)
+        # simulation settings
+        self.sim.dt = 1.0 / 60.0
+
+
+@configclass
+class ReducedLoopLynxReachEnvCfg(ReducedReachEnvCfg):
+    def __post_init__(self):
+        # post init of parent
+        super().__post_init__()
+
+        # switch robot to franka
+        self.scene.robot = LYNX_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        # override rewards
+        self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ["tool_link"]
+        self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ["tool_link"]
+        self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["tool_link"]
+
+        # override actions
+        self.actions.arm_action = mdp.JointPositionActionCfg(
+            asset_name="robot", joint_names=["joint_.*"], scale=0.5, use_default_offset=True
+        )
+        # override command generator body
+        # end-effector is along z-direction
+        self.commands.ee_pose.body_name = "tool_link"
+        self.commands.ee_pose.ranges.pitch = (math.pi, math.pi)
+
+
+@configclass
+class ReducedLoopLynxReachEnvCfg_PLAY(ReducedLynxReachEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
