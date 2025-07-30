@@ -262,7 +262,11 @@ class RayCaster(SensorBase):
                 self.cfg.ray_alignment = "base"
                 msg += " Setting ray_alignment to 'base'."
             # log the warning
+<<<<<<< HEAD
             logger.warning(msg)
+=======
+            omni.log.warn(msg)
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
         # ray cast based on the sensor poses
         if self.cfg.ray_alignment == "world":
             # apply horizontal drift to ray starting position in ray caster frame

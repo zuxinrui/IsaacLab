@@ -48,6 +48,9 @@ class ArticulationCfg(AssetBaseCfg):
     then you should set this to `/robot2`.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
     The path must start with a slash (`/`).
     """
 

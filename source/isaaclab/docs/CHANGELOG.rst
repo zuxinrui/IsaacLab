@@ -5,10 +5,26 @@ Changelog
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 0.54.3 (2026-02-04)
 ~~~~~~~~~~~~~~~~~~~
 =======
 =======
+=======
+0.41.4 (2025-07-30)
+~~~~~~~~~~~~~~~~~~~~
+
+Fixed
+^^^^^
+
+* Improved handling of deprecated flag :attr:`~isaaclab.sensors.RayCasterCfg.attach_yaw_only`.
+  Previously, the flag was only handled if it was set to True. This led to a bug where the yaw was not accounted for
+  when the flag was set to False.
+* Fixed the handling of interval-based events inside :class:`~isaaclab.managers.EventManager` to properly handle
+  their resets. Previously, only class-based events were properly handled.
+
+
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 0.41.3 (2025-07-30)
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -1158,11 +1174,16 @@ Added
 ^^^^^
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 * Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered
   contact forces in the world frame.
 =======
 * Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered contact forces in the world frame.
 >>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
+=======
+* Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered
+  contact forces in the world frame.
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 
 
 0.42.24 (2025-06-25)

@@ -65,9 +65,13 @@ class modify_env_param(ManagerTermBase):
     .. code-block:: python
 
         def modify_fn(env, env_ids, old_value, **modify_params) -> new_value | modify_env_param.NO_CHANGE:
+<<<<<<< HEAD
             # modify the value based on the old value and the modify parameters
             new_value = old_value + modify_params["value"]
             return new_value
+=======
+            ...
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 
     where ``env`` is the learning environment, ``env_ids`` are the sub-environment indices,
     ``old_value`` is the current value of the target attribute, and ``modify_params``
@@ -80,10 +84,17 @@ class modify_env_param(ManagerTermBase):
     current value, and the setter writes a new value back to the attribute.
 
     This term processes getter/setter accessors for a target attribute in an(specified by
+<<<<<<< HEAD
     as an "address" in the term configuration :attr:`cfg.params["address"]`) the first time it is called,
     then on each invocation reads the current value, applies a user-provided :attr:`modify_fn`,
     and writes back the result. Since :obj:`None` in this case can sometime be desirable value
     to write, we use token, :attr:`NO_CHANGE`, as non-modification signal to this class, see usage below.
+=======
+    as an "address" in the term configuration`cfg.params["address"]`) the first time it is called, then on each invocation
+    reads the current value, applies a user-provided `modify_fn`, and writes back
+    the result. Since None in this case can sometime be desirable value to write, we
+    use token, NO_CHANGE, as non-modification signal to this class, see usage below.
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 
     Usage:
         .. code-block:: python
@@ -282,7 +293,11 @@ class modify_term_cfg(modify_env_param):
             command_object_pose_xrange_adr = CurrTerm(
                 func=mdp.modify_term_cfg,
                 params={
+<<<<<<< HEAD
                     "address": "commands.object_pose.ranges.pos_x",  # note: `_manager.cfg` is omitted
+=======
+                    "address": "commands.object_pose.ranges.pos_x",   # note: `_manager.cfg` is omitted
+>>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
                     "modify_fn": override_value,
                     "modify_params": {"value": (-0.75, -0.25), "num_steps": 12000},
                 },
