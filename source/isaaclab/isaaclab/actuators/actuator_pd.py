@@ -263,14 +263,20 @@ class DCMotor(IdealPDActuator):
 
     The figure below demonstrates the clipping action for example (velocity, torque) pairs.
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
 
     .. figure:: ../../_static/actuator-group/dc_motor_clipping.jpg
         :align: center
         :figwidth: 100%
         :alt: The effort clipping as a function of joint velocity for a linear DC Motor.
 
+<<<<<<< HEAD
 =======
 >>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
+=======
+>>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
     """
 
     cfg: DCMotorCfg

@@ -193,8 +193,11 @@ autodoc_mock_imports = [
     "nvidia.srl",
     "flatdict",
     "IPython",
+<<<<<<< HEAD
     "cv2",
     "imageio",
+=======
+>>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
     "ipywidgets",
     "mpl_toolkits",
 ]

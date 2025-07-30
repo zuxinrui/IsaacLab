@@ -12,7 +12,7 @@ Changelog
 =======
 =======
 0.41.4 (2025-07-30)
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Fixed
 ^^^^^
@@ -26,7 +26,7 @@ Fixed
 
 >>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 0.41.3 (2025-07-30)
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Added
 ^^^^^
@@ -45,6 +45,7 @@ Removed
 >>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
 0.41.2 (2025-07-28)
+<<<<<<< HEAD
 ~~~~~~~~~~~~~~~~~~~~
 >>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
 
@@ -1062,6 +1063,9 @@ Changed
 0.44.5 (2025-07-28)
 ~~~~~~~~~~~~~~~~~~~
 
+=======
+~~~~~~~~~~~~~~~~~~~
+>>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
 Fixed
 ^^^^^
 
