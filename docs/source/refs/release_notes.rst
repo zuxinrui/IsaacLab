@@ -4,6 +4,7 @@ Release Notes
 The release notes are now available in the `Isaac Lab GitHub repository <https://github.com/isaac-sim/IsaacLab/releases>`_.
 We summarize the release notes here for convenience.
 
+<<<<<<< HEAD
 v2.3.2
 ======
 
@@ -786,6 +787,8 @@ Documentation
 * Add network requirements to cloudxr teleop doc by @lotusl-code
 
 
+=======
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 v2.1.1
 ======
 
@@ -828,7 +831,11 @@ Improvements
 ------------
 
 Core API
+<<<<<<< HEAD
 ~~~~~~~~
+=======
+^^^^^^^^
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 * **Actuator Interfaces**
   * Fixes implicit actuator limits configs for assets by @ooctipus
@@ -872,7 +879,11 @@ Core API
   * Allows slicing from list values in dicts by @LinghengMeng @kellyguo11
 
 Tasks API
+<<<<<<< HEAD
 ~~~~~~~~~
+=======
+^^^^^^^^^
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 * Adds support for ``module:task`` and gymnasium >=1.0 by @kellyguo11
 * Adds RL library error hints by @Toni-SM
@@ -886,7 +897,11 @@ Tasks API
 * Pre-processes SB3 env image obs-space for CNN pipeline by @ooctipus
 
 Infrastructure
+<<<<<<< HEAD
 ~~~~~~~~~~~~~~
+=======
+^^^^^^^^^^^^^^^
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 * **Dependencies**
   * Updates torch to 2.7.0 with CUDA 12.8 by @kellyguo11
@@ -913,7 +928,11 @@ Bug Fixes
 ---------
 
 Core API
+<<<<<<< HEAD
 ~~~~~~~~
+=======
+^^^^^^^^
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 * **Actuator Interfaces**
   * Fixes DCMotor clipping for negative power by @jtigue-bdai
@@ -941,12 +960,20 @@ Core API
   * Fixes ``quat_inv()`` implementation by @ozhanozen
 
 Tasks API
+<<<<<<< HEAD
 ~~~~~~~~~
+=======
+^^^^^^^^^
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 * Fixes LSTM to ONNX export by @jtigue-bdai
 
 Example Tasks
+<<<<<<< HEAD
 ~~~~~~~~~~~~~
+=======
+^^^^^^^^^^^^^
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 * Removes contact termination redundancy by @louislelay
 * Fixes memory leak in SDF by @leondavi
@@ -1944,7 +1971,11 @@ New Features
 
 * Integrated CI/CD pipeline, which is triggered on pull requests and publishes the results publicly
 * Extended support for Windows OS platforms
+<<<<<<< HEAD
 * Added tiled render based Camera
+=======
+* Added `tiled rendered <https://isaac-sim.github.io/IsaacLab/source/features/tiled_rendering.html>`_ based Camera
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
   sensor implementation. This provides optimized RGB-D rendering throughputs of up to 10k frames per second.
 * Added support for multi-GPU and multi-node training for the RL-Games library
 * Integrated APIs for environment designing (direct workflow) without relying on managers

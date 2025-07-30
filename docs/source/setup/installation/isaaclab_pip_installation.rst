@@ -89,7 +89,16 @@ Installing dependencies
 
       pip install isaaclab[isaacsim,all]==2.3.2.post1 --extra-index-url https://pypi.nvidia.com
 
+<<<<<<< HEAD
 -  Install a CUDA-enabled PyTorch 2.7.0 build for CUDA 12.8 that matches your system architecture:
+=======
+.. note::
+
+   Currently, we only provide pip packages for every major release of Isaac Lab.
+   For example, we provide the pip package for release 2.0.0 and 2.1.0, but not 2.0.2.
+   In the future, we will provide pip packages for every minor release of Isaac Lab.
+
+>>>>>>> b395003b372 (Updates version to release 2.1.1 (#3047))
 
 <<<<<<< HEAD
    .. tab-set::
