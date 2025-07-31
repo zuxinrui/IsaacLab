@@ -295,7 +295,7 @@ class ReducedLoopReachEnvCfg(ManagerBasedRLEnvCfg):
 
 
 @configclass
-class ReducedLoopLynxReachEnvCfg(ReducedReachEnvCfg):
+class ReducedLoopLynxReachEnvCfg(ReducedLoopReachEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
@@ -318,7 +318,7 @@ class ReducedLoopLynxReachEnvCfg(ReducedReachEnvCfg):
 
 
 @configclass
-class ReducedLoopLynxReachEnvCfg_PLAY(ReducedLynxReachEnvCfg):
+class ReducedLoopLynxReachEnvCfg_PLAY(ReducedLoopLynxReachEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
