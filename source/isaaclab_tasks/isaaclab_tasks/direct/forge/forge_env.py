@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+=======
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -121,6 +125,7 @@ class ForgeEnv(FactoryEnv):
         prev_actions = self.actions.clone()
         prev_actions[:, 3:5] = 0.0
 
+<<<<<<< HEAD
         obs_dict.update(
             {
                 "fingertip_pos": self.noisy_fingertip_pos,
@@ -140,6 +145,23 @@ class ForgeEnv(FactoryEnv):
                 "prev_actions": prev_actions,
             }
         )
+=======
+        obs_dict.update({
+            "fingertip_pos": self.noisy_fingertip_pos,
+            "fingertip_pos_rel_fixed": self.noisy_fingertip_pos - noisy_fixed_pos,
+            "fingertip_quat": self.noisy_fingertip_quat,
+            "force_threshold": self.contact_penalty_thresholds[:, None],
+            "ft_force": self.noisy_force,
+            "prev_actions": prev_actions,
+        })
+
+        state_dict.update({
+            "ema_factor": self.ema_factor,
+            "ft_force": self.force_sensor_smooth[:, 0:3],
+            "force_threshold": self.contact_penalty_thresholds[:, None],
+            "prev_actions": prev_actions,
+        })
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
 
         obs_tensors = factory_utils.collapse_obs_dict(obs_dict, self.cfg.obs_order + ["prev_actions"])
         state_tensors = factory_utils.collapse_obs_dict(state_dict, self.cfg.state_order + ["prev_actions"])
@@ -194,8 +216,12 @@ class ForgeEnv(FactoryEnv):
         desired_xyz = torch.stack([desired_roll, desired_pitch, desired_yaw], dim=1)
 
         # (2.b.ii) Correct the direction of motion to avoid joint limit.
+<<<<<<< HEAD
         # Map yaws between [-125, 235] degrees
         # (so that angles appear on a continuous span uninterrupted by the joint limit)
+=======
+        # Map yaws between [-125, 235] degrees (so that angles appear on a continuous span uninterrupted by the joint limit).
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
         curr_yaw = factory_utils.wrap_yaw(curr_yaw)
         desired_yaw = factory_utils.wrap_yaw(desired_yaw)
 

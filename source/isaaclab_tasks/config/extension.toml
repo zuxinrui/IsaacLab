@@ -1,7 +1,11 @@
 [package]
 
 # Note: Semantic Versioning is used: https://semver.org/
+<<<<<<< HEAD
 version = "0.11.14"
+=======
+version = "0.10.37"
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
 
 # Description
 title = "Isaac Lab Environments"

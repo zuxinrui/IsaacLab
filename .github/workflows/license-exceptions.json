@@ -369,6 +369,7 @@
     "package": "regex",
     "license": "UNKNOWN",
     "comment": "Apache 2.0"
+<<<<<<< HEAD
   },
   {
     "package": "anyio",
@@ -444,5 +445,7 @@
     "package": "matplotlib-inline",
     "license": "UNKNOWN",
     "comment": "BSD-3"
+=======
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
   }
 ]

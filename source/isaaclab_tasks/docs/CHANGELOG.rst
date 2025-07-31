@@ -1,6 +1,7 @@
 Changelog
 ---------
 
+<<<<<<< HEAD
 0.11.15 (2026-03-07)
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -248,6 +249,9 @@ Added
 
 
 0.10.44 (2025-07-16)
+=======
+0.10.37 (2025-07-16)
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
 ~~~~~~~~~~~~~~~~~~~~
 
 Added
@@ -259,6 +263,7 @@ Added
   penalty, dynamics randomization, and success prediction.
 
 
+<<<<<<< HEAD
 0.10.43 (2025-07-24)
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -287,6 +292,9 @@ Fixed
 
 
 0.10.40 (2025-06-26)
+=======
+0.10.36 (2025-06-26)
+>>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
 ~~~~~~~~~~~~~~~~~~~~
 
 Fixed
