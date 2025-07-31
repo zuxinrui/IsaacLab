@@ -13,6 +13,7 @@
 # Distributed training via rsl_rl:
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v0 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v2 --distributed --headless --num_envs 16384
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Open-Drawer-Franka-v0 --distributed --headless --num_envs 16384
 
 # also works for 4070 ti super (16GB VRAM), the observation excludes joint velocities:
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v1 --distributed --headless --num_envs 16384
@@ -22,4 +23,5 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-v0 
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-v2 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2025-07-29_23-07-04 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2025-07-29_23-07-04/model_500.pt
 
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Open-Drawer-Franka-v0 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/franka_open_drawer/2025-07-31_12-54-00 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/franka_open_drawer/2025-07-31_12-54-00/model_50.pt
 
