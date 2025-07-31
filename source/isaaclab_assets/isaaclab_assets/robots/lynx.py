@@ -11,7 +11,7 @@ from isaaclab.utils import configclass
 ##
 # USD Reference
 ##
-# _USD_PATH = "source/isaaclab_assets/data/Robots/Lynx/lynx-vu-urdf.usd"
+_USD_PATH_VU = "source/isaaclab_assets/data/Robots/Lynx/lynx-vu-urdf.usd"
 _USD_PATH = "source/isaaclab_assets/data/Robots/Lynx/lynx-isaacsim-materials-urdf.usd"
 
 
@@ -25,7 +25,7 @@ class LynxArmCfg(ArticulationCfg):
     """Configuration for the Lynx arm."""
 
     spawn: sim_utils.UsdFileCfg = sim_utils.UsdFileCfg(
-        usd_path=_USD_PATH,
+        usd_path=_USD_PATH_VU,
         activate_contact_sensors=False,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
