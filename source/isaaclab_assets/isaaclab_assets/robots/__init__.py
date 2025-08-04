@@ -25,3 +25,4 @@ from .spot import *
 from .unitree import *
 from .universal_robots import *
 from .lynx import *  # noqa: F401, F403
+from .panda_jax import *  # noqa: F401, F403
