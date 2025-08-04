@@ -23,7 +23,7 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import isaaclab_tasks.manager_based.manipulation.reach.mdp as mdp
-from isaaclab_assets import LYNX_CFG
+from isaaclab_assets import LYNX_CFG, LYNX_CFG_TCP
 
 ##
 # Scene definition
@@ -267,6 +267,7 @@ class ReducedLynxReachEnvCfg_PLAY(ReducedLynxReachEnvCfg):
         self.observations.policy.enable_corruption = False
 
 
+# ######################### Create the scene with the Lynx arm (V2): #########################
 @configclass
 class ReducedLoopReachEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
@@ -301,11 +302,11 @@ class ReducedLoopLynxReachEnvCfg(ReducedLoopReachEnvCfg):
         super().__post_init__()
 
         # switch robot to franka
-        self.scene.robot = LYNX_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = LYNX_CFG_TCP.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # override rewards
-        self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ["tool_link"]
-        self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ["tool_link"]
-        self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["tool_link"]
+        self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ["tcp"]
+        self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ["tcp"]
+        self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["tcp"]
 
         # override actions
         self.actions.arm_action = mdp.JointPositionActionCfg(
@@ -313,7 +314,7 @@ class ReducedLoopLynxReachEnvCfg(ReducedLoopReachEnvCfg):
         )
         # override command generator body
         # end-effector is along z-direction
-        self.commands.ee_pose.body_name = "tool_link"
+        self.commands.ee_pose.body_name = "tcp"
         self.commands.ee_pose.ranges.pitch = (math.pi, math.pi)
 
 
