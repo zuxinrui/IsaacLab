@@ -43,6 +43,6 @@ class LynxReachRslRlOnPolicyRunnerCfg(RslRlOnPolicyRunnerCfg):
 
     num_steps_per_env = 24
     max_iterations = 10000
-    save_interval = 500
+    save_interval = 1000
     experiment_name = "LynxReach"
     empirical_normalization = True

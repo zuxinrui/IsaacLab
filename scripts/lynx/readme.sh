@@ -20,6 +20,8 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v1
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v2 --distributed --headless --num_envs 16384
 
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v3 --headless --num_envs 16384
+
 
 # play the trained model:
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-v0 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2025-07-28_17-51-38 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2025-07-28_17-51-38/model_4000.pt
@@ -28,3 +30,4 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-v2 
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Open-Drawer-Franka-v0 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/franka_open_drawer/2025-07-31_12-54-00 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/franka_open_drawer/2025-07-31_12-54-00/model_50.pt
 
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-v3 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2025-08-05_12-11-18 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2025-08-05_12-11-18/model_1000.pt
