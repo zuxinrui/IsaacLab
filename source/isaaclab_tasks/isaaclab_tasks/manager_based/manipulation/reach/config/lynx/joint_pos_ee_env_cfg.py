@@ -74,9 +74,9 @@ class CommandsCfg:
         resampling_time_range=(4.0, 4.0),
         debug_vis=True,
         ranges=mdp.UniformPoseCommandCfg.Ranges(
-            pos_x=(0.35, 0.5),
+            pos_x=(0.35, 0.65),
             pos_y=(-0.2, 0.2),
-            pos_z=(0.3, 0.65),
+            pos_z=(0.15, 0.5),
             roll=(0.0, 0.0),
             pitch=MISSING,  # depends on end-effector axis
             yaw=(-3.14, 3.14),
@@ -93,7 +93,7 @@ class ActionsCfg:
 
 
 @configclass
-class ObservationsWithoutVelActCfg:
+class ObservationsCfg:
     """Observation specifications for the MDP."""
 
     @configclass
@@ -102,7 +102,6 @@ class ObservationsWithoutVelActCfg:
 
         # observation terms (order preserved)
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        # joint_imu = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu", body_names=["imu_sensor"])})
         # joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         ee_pose = ObsTerm(func=mdp.body_pose_w, params={"asset_cfg": SceneEntityCfg("robot", body_names=["tcp"])})
         pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "ee_pose"})
@@ -180,15 +179,19 @@ class CurriculumCfg:
     )
 
 
-# ######################### Create the scene with the Lynx arm (V3): #########################
+##
+# Environment configuration
+##
+
+
 @configclass
-class DeltaReachEnvCfg(ManagerBasedRLEnvCfg):
+class ReachEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
 
     # Scene settings
     scene: ReachSceneCfg = ReachSceneCfg(num_envs=4096, env_spacing=2.5)
     # Basic settings
-    observations: ObservationsWithoutVelActCfg = ObservationsWithoutVelActCfg()
+    observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
     # MDP settings
@@ -200,7 +203,7 @@ class DeltaReachEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 3  # decimation is for solving sim2real gap
+        self.decimation = 3
         self.sim.render_interval = self.decimation
         self.episode_length_s = 12.0
         self.viewer.eye = (3.5, 3.5, 3.5)
@@ -209,7 +212,7 @@ class DeltaReachEnvCfg(ManagerBasedRLEnvCfg):
 
 
 @configclass
-class DeltaLynxReachEnvCfg(DeltaReachEnvCfg):
+class LynxReachEnvCfg(ReachEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
@@ -222,8 +225,8 @@ class DeltaLynxReachEnvCfg(DeltaReachEnvCfg):
         self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["tcp"]
 
         # override actions
-        self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
-            asset_name="robot", joint_names=["joint_.*"], scale=math.pi / 6., use_zero_offset=True,
+        self.actions.arm_action = mdp.JointPositionActionCfg(
+            asset_name="robot", joint_names=["joint_.*"], scale=1.0, use_default_offset=True
         )
         # override command generator body
         # end-effector is along z-direction
@@ -232,7 +235,7 @@ class DeltaLynxReachEnvCfg(DeltaReachEnvCfg):
 
 
 @configclass
-class DeltaLynxReachEnvCfg_PLAY(DeltaLynxReachEnvCfg):
+class LynxReachEnvCfg_PLAY(LynxReachEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
@@ -241,3 +244,4 @@ class DeltaLynxReachEnvCfg_PLAY(DeltaLynxReachEnvCfg):
         self.scene.env_spacing = 2.5
         # disable randomization for play
         self.observations.policy.enable_corruption = False
+
