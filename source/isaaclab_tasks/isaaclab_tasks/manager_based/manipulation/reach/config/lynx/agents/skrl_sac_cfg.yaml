@@ -16,11 +16,11 @@ models:
       - name: net_layer_1
         input: STATES
         layers: [64]
-        activations: elu
+        activations: relu
       - name: net_layer_2
         input: net_layer_1
         layers: [64]
-        activations: elu
+        activations: relu
       - name: net_output_layer
         input: net_layer_2
         layers: [self.num_actions]
@@ -32,7 +32,7 @@ models:
       - name: net
         input: STATES
         layers: [64, 64]
-        activations: elu
+        activations: relu
     output: ONE
   critic_2:  # see deterministic_model parameters
     class: DeterministicMixin
@@ -41,7 +41,7 @@ models:
       - name: net
         input: STATES
         layers: [64, 64]
-        activations: elu
+        activations: relu
     output: ONE
   target_critic_1:  # see deterministic_model parameters
     class: DeterministicMixin
@@ -50,7 +50,7 @@ models:
       - name: net
         input: STATES
         layers: [64, 64]
-        activations: elu
+        activations: relu
     output: ONE
   target_critic_2:  # see deterministic_model parameters
     class: DeterministicMixin
@@ -59,7 +59,7 @@ models:
       - name: net
         input: STATES
         layers: [64, 64]
-        activations: elu
+        activations: relu
     output: ONE
 
 
@@ -67,7 +67,7 @@ models:
 # https://skrl.readthedocs.io/en/latest/api/memories/random.html
 memory:
   class: RandomMemory
-  memory_size: 2048  # automatically determined (same as agent:rollouts)
+  memory_size: 50000  # automatically determined (same as agent:rollouts)
 
 
 # PPO agent configuration (field names are from PPO_DEFAULT_CONFIG)
@@ -79,8 +79,8 @@ agent:
 
   discount_factor: 0.99
   polyak: 0.005
-  actor_learning_rate: 1.0e-03    # actor learning rate
-  critic_learning_rate: 1.0e-03   # critic learning rate
+  actor_learning_rate: 3.0e-04    # actor learning rate
+  critic_learning_rate: 3.0e-04   # critic learning rate
   learning_rate_scheduler: KLAdaptiveLR        # learning rate scheduler class (see torch.optim.lr_scheduler)
   learning_rate_scheduler_kwargs:
     kl_threshold: 0.01  # learning rate scheduler's kwargs (e.g. {"step_size": 1e-3})
@@ -91,13 +91,13 @@ agent:
   value_preprocessor_kwargs: null
 
   random_timesteps: 0          # random exploration steps
-  learning_starts: 0          # learning starts after this many steps
+  learning_starts: 10000         # learning starts after this many steps
 
   grad_norm_clip: 1.0            # clipping coefficient for the norm of the gradients
 
   learn_entropy: True          # learn entropy
   entropy_learning_rate: 1.0e-03  # entropy learning rate
-  initial_entropy_value: 0.2   # initial entropy value
+  initial_entropy_value: 0.06   # initial entropy value
   # target_entropy: None         # target entropy
 
   # rewards_shaper: None         # rewards shaping function: Callable(reward, timestep, timesteps) -> reward

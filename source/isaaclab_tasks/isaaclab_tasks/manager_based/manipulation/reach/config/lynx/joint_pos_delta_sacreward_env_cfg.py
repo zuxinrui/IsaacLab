@@ -76,7 +76,7 @@ class CommandsCfg:
         ranges=mdp.UniformPoseCommandCfg.Ranges(
             pos_x=(0.35, 0.5),
             pos_y=(-0.2, 0.2),
-            pos_z=(0.5, 0.65),
+            pos_z=(0.3, 0.65),
             roll=(0.0, 0.0),
             pitch=MISSING,  # depends on end-effector axis
             yaw=(-3.14, 3.14),
@@ -136,20 +136,25 @@ class RewardsCfg:
 
     # task terms
     end_effector_position_tracking = RewTerm(
-        func=mdp.position_command_error,
-        weight=-0.2,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+        func=mdp.position_command_error_exp,
+        weight=1.0,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 1.3, "command_name": "ee_pose"},
     )
-    end_effector_position_tracking_fine_grained = RewTerm(
-        func=mdp.position_command_error_tanh,
-        weight=0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.1, "command_name": "ee_pose"},
-    )
-    end_effector_orientation_tracking = RewTerm(
-        func=mdp.orientation_command_error,
-        weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
-    )
+    # end_effector_position_tracking_fine_grained = RewTerm(
+    #     func=mdp.position_command_error_tanh,
+    #     weight=1.0,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.1, "command_name": "ee_pose"},
+    # )
+    # end_effector_position_tracking_fine_grained = RewTerm(
+    #     func=mdp.position_command_error_reach,
+    #     weight=1.0,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+    # )
+    # end_effector_orientation_tracking = RewTerm(
+    #     func=mdp.orientation_command_error,
+    #     weight=-0.1,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+    # )
 
     # action penalty
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.0001)
@@ -200,7 +205,7 @@ class DeltaReachEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 6  # decimation is for solving sim2real gap
+        self.decimation = 3  # decimation is for solving sim2real gap
         self.sim.render_interval = self.decimation
         self.episode_length_s = 12.0
         self.viewer.eye = (3.5, 3.5, 3.5)
@@ -218,8 +223,8 @@ class DeltaLynxReachEnvCfg(DeltaReachEnvCfg):
         self.scene.robot = LYNX_CFG_TCP.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # override rewards
         self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ["tcp"]
-        self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ["tcp"]
-        self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["tcp"]
+        # self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ["tcp"]
+        # self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ["tcp"]
 
         # override actions
         self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
