@@ -117,7 +117,6 @@ class PinkInverseKinematicsAction(ActionTerm):
         # Pre-allocate tensor for base frame computations
         self._base_link_frame_buffer = torch.zeros(self.num_envs, 4, 4, device=self.device)
 
-    # ==================== Properties ====================
 
     @property
     def hand_joint_dim(self) -> int:
@@ -302,7 +301,6 @@ class PinkInverseKinematicsAction(ActionTerm):
 
                 task.set_target(target)
 
-    # ==================== Action Application ====================
 
     def apply_actions(self) -> None:
         """Apply the computed joint positions based on the inverse kinematics solution."""
@@ -355,7 +353,6 @@ class PinkInverseKinematicsAction(ActionTerm):
 
         return torch.stack(ik_solutions)
 
-    # ==================== Reset ====================
 
     def reset(self, env_ids: Sequence[int] | None = None) -> None:
         """Reset the action term for specified environments.

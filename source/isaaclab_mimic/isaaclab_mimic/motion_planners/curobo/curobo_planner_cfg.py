@@ -250,12 +250,9 @@ class CuroboPlannerCfg:
 
         return out_path
 
-    # =====================================================================================
     # FACTORY METHODS FOR ROBOT CONFIGURATIONS
-    # =====================================================================================
     """
     Creating Custom Robot Configurations
-    =====================================
 
     To create a configuration for your own robot, follow these steps:
 

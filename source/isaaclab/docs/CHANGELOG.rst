@@ -1,16 +1,6 @@
 Changelog
 ---------
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-0.54.3 (2026-02-04)
-~~~~~~~~~~~~~~~~~~~
-=======
-=======
-=======
 0.41.4 (2025-07-30)
 ~~~~~~~~~~~~~~~~~~~
 
@@ -24,7 +14,6 @@ Fixed
   their resets. Previously, only class-based events were properly handled.
 
 
->>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 0.41.3 (2025-07-30)
 ~~~~~~~~~~~~~~~~~~~
 
@@ -42,42 +31,13 @@ Removed
 * Removed :attr:`xxx_external_wrench_frame` flag from asset configuration classes in favor of direct argument
   passed to the :meth:`set_external_force_and_torque` function.
 
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
 0.41.2 (2025-07-28)
-<<<<<<< HEAD
-~~~~~~~~~~~~~~~~~~~~
->>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
-
-Fixed
-^^^^^
-
-<<<<<<< HEAD
-* Fixed :class:`~isaaclab.envs.mdp.actions.JointPositionToLimitsAction` and
-  :class:`~isaaclab.envs.mdp.actions.EMAJointPositionToLimitsAction` ignoring
-  ``preserve_order=True`` when the number of specified joints matches the total
-  number of joints in the asset. The optimization that replaced joint indices with
-  ``slice(None)`` now correctly checks for the ``preserve_order`` flag.
-
-
-0.54.2 (2026-01-28)
-~~~~~~~~~~~~~~~~~~~
-
-Changed
-^^^^^^^
-
-* Moved :mod:`isaaclab.sensors.tacsl_sensor` to :mod:`isaaclab_contrib.sensors.tacsl_sensor` module,
-  since it is not completely ready for release yet.
-
-
-0.54.1 (2026-01-25)
-=======
 * Fixed :meth:`isaaclab.scene.reset_to` to properly accept None as valid argument.
 * Added tests to verify that argument types.
 
 
 0.41.1 (2025-07-22)
->>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
 ~~~~~~~~~~~~~~~~~~~
 
 Added
@@ -1063,9 +1023,7 @@ Changed
 0.44.5 (2025-07-28)
 ~~~~~~~~~~~~~~~~~~~
 
-=======
 ~~~~~~~~~~~~~~~~~~~
->>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
 Fixed
 ^^^^^
 
@@ -1119,22 +1077,15 @@ Changed
 * Changed the way clipping is handled for :class:`~isaaclab.actuator.DCMotor` for torque-speed points in when in
   negative power regions.
 
-=======
 0.41.1 (2025-07-22)
 ~~~~~~~~~~~~~~~~~~~
 
->>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 Added
 ^^^^^
 
 * Added unit tests for :class:`~isaaclab.actuator.ImplicitActuator`, :class:`~isaaclab.actuator.IdealPDActuator`,
   and :class:`~isaaclab.actuator.DCMotor` independent of :class:`~isaaclab.assets.Articulation`
 
-<<<<<<< HEAD
-
-0.43.0 (2025-07-21)
-=======
-=======
 Changed
 ^^^^^^^
 
@@ -1142,9 +1093,7 @@ Changed
   negative power regions.
 
 
->>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 0.41.0 (2025-07-21)
->>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 ~~~~~~~~~~~~~~~~~~~
 
 Changed
@@ -1156,11 +1105,7 @@ Changed
   torch version, we are now overwriting the torch installation step in isaaclab.sh when running ``./isaaclab.sh -i``.
 
 
-<<<<<<< HEAD
-0.42.26 (2025-06-29)
-=======
 0.40.23 (2025-06-29)
->>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
 ~~~~~~~~~~~~~~~~~~~~
 
 Added
@@ -1177,17 +1122,9 @@ Added
 Added
 ^^^^^
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-* Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered
-  contact forces in the world frame.
-=======
 * Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered contact forces in the world frame.
->>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
-=======
 * Added :attr:`~isaaclab.sensors.ContactSensorData.force_matrix_w_history` that tracks the history of the filtered
   contact forces in the world frame.
->>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
 
 
 0.42.24 (2025-06-25)

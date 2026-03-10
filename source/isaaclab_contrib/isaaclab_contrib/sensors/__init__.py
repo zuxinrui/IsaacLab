@@ -16,7 +16,6 @@ The following table summarizes the interpretation of the prim paths for differen
 
 +---------------------+---------------------------+---------------------------------------------------------------+
 | Sensor Type         | Example Prim Path         | Pre-check                                                     |
-+=====================+===========================+===============================================================+
 | Visuo-Tactile Sensor| /World/robot/base         | Leaf exists and is a physics body (Rigid Body)                |
 +---------------------+---------------------------+---------------------------------------------------------------+
 

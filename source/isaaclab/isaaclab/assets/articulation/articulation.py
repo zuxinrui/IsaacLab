@@ -1073,9 +1073,6 @@ class Articulation(AssetBase):
                 torch.arange(self.num_bodies, dtype=torch.int32, device=self.device)[body_ids], dtype=wp.int32
             )
         elif not isinstance(body_ids, torch.Tensor):
-<<<<<<< HEAD
-            body_ids = wp.array(body_ids, dtype=wp.int32, device=self.device)
-=======
             body_ids = torch.tensor(body_ids, dtype=torch.long, device=self.device)
 
         # note: we need to do this complicated indexing since torch doesn't support multi-indexing
@@ -1101,7 +1098,6 @@ class Articulation(AssetBase):
             # the external wrench positions when multiple calls to this functions are made with and without positions.
             self.uses_external_wrench_positions = True
             self._external_wrench_positions_b.flatten(0, 1)[indices] = positions.flatten(0, 1)
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
         else:
             body_ids = wp.from_torch(body_ids.to(torch.int32), dtype=wp.int32)
 
@@ -1636,11 +1632,6 @@ class Articulation(AssetBase):
         self._ALL_INDICES_WP = wp.from_torch(self._ALL_INDICES.to(torch.int32), dtype=wp.int32)
         self._ALL_BODY_INDICES_WP = wp.from_torch(self._ALL_BODY_INDICES.to(torch.int32), dtype=wp.int32)
 
-<<<<<<< HEAD
-        # external wrench composer
-        self._instantaneous_wrench_composer = WrenchComposer(self)
-        self._permanent_wrench_composer = WrenchComposer(self)
-=======
         # external forces and torques
         self.has_external_wrench = False
         self.uses_external_wrench_positions = False
@@ -1648,7 +1639,10 @@ class Articulation(AssetBase):
         self._external_torque_b = torch.zeros_like(self._external_force_b)
         self._external_wrench_positions_b = torch.zeros_like(self._external_force_b)
         self._use_global_wrench_frame = False
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
+
+        # wrench composers
+        self._instantaneous_wrench_composer = WrenchComposer(self)
+        self._permanent_wrench_composer = WrenchComposer(self)
 
         # asset named data
         self._data.joint_names = self.joint_names

@@ -65,17 +65,10 @@ class RayCasterCfg(SensorBaseCfg):
     The options are:
 
     * ``base`` if the rays' starting positions and directions track the full root position and orientation.
-<<<<<<< HEAD
-    * ``yaw`` if the rays' starting positions and directions track root position and only yaw component of
-      the orientation. This is useful for ray-casting height maps.
-    * ``world`` if rays' starting positions and directions are always fixed. This is useful in combination
-      with a mapping package on the robot and querying ray-casts in a global frame.
-=======
     * ``yaw`` if the rays' starting positions and directions track root position and only yaw component of orientation.
       This is useful for ray-casting height maps.
     * ``world`` if rays' starting positions and directions are always fixed. This is useful in combination with a mapping
       package on the robot and querying ray-casts in a global frame.
->>>>>>> 61a1114c2db (Fixes interval event resets and deprecation of `attach_yaw_only` flag (#2958))
     """
 
     pattern_cfg: PatternBaseCfg = MISSING

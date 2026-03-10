@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-=======
 # Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
->>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -89,13 +85,7 @@ class EventCfg:
     )
 
     dead_zone_thresholds = EventTerm(
-<<<<<<< HEAD
-        func=randomize_dead_zone,
-        mode="interval",
-        interval_range_s=(2.0, 2.0),  # (0.25, 0.25)
-=======
         func=randomize_dead_zone, mode="interval", interval_range_s=(2.0, 2.0)  # (0.25, 0.25)
->>>>>>> 9cd69dd5d80 (Adds FORGE tasks for contact-rich manipulation with force sensing to IsaacLab (#2968))
     )
 
 

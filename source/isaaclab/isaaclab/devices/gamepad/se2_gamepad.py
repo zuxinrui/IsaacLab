@@ -31,13 +31,10 @@ class Se2Gamepad(DeviceBase):
     The command comprises of the base linear and angular velocity: :math:`(v_x, v_y, \omega_z)`.
 
     Key bindings:
-        ====================== ========================= ========================
         Command                Key (+ve axis)            Key (-ve axis)
-        ====================== ========================= ========================
         Move along x-axis      left stick up             left stick down
         Move along y-axis      left stick right          left stick left
         Rotate along z-axis    right stick right         right stick left
-        ====================== ========================= ========================
 
     .. seealso::
 

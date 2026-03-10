@@ -30,13 +30,10 @@ class Se2Keyboard(DeviceBase):
     The command comprises of the base linear and angular velocity: :math:`(v_x, v_y, \omega_z)`.
 
     Key bindings:
-        ====================== ========================= ========================
         Command                Key (+ve axis)            Key (-ve axis)
-        ====================== ========================= ========================
         Move along x-axis      Numpad 8 / Arrow Up       Numpad 2 / Arrow Down
         Move along y-axis      Numpad 4 / Arrow Right    Numpad 6 / Arrow Left
         Rotate along z-axis    Numpad 7 / Z              Numpad 9 / X
-        ====================== ========================= ========================
 
     .. seealso::
 

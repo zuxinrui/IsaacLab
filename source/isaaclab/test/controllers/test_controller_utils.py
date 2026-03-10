@@ -121,9 +121,7 @@ def test_urdf_file(mock_urdf_content):
     shutil.rmtree(test_dir)
 
 
-# =============================================================================
 # Test cases for change_revolute_to_fixed function
-# =============================================================================
 
 
 def test_single_joint_conversion(test_urdf_file, mock_urdf_content):
@@ -274,9 +272,7 @@ def test_joint_attributes_preserved(test_urdf_file):
     assert '<limit lower="-3.14" upper="3.14" effort="100" velocity="1"/>' in modified_content
 
 
-# =============================================================================
 # Test cases for change_revolute_to_fixed_regex function
-# =============================================================================
 
 
 def test_regex_single_joint_conversion(test_urdf_file, mock_urdf_content):
@@ -495,9 +491,7 @@ def test_regex_special_characters(test_urdf_file, mock_urdf_content):
     assert '<joint name="wrist_to_gripper" type="fixed">' in modified_content
 
 
-# =============================================================================
 # Test cases for load_torchscript_model function
-# =============================================================================
 
 
 @pytest.fixture

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-# Copyright (c) 2025-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-=======
 # Copyright (c) 2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
->>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -16,16 +12,10 @@ simulation_app = AppLauncher(headless=HEADLESS).app
 
 """Rest of imports follows"""
 
-<<<<<<< HEAD
-import pytest
-import torch
-
-=======
 import torch
 
 import pytest
 
->>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 from isaaclab.actuators import DCMotorCfg
 
 
@@ -96,7 +86,6 @@ def test_dc_motor_clip(num_envs, num_joints, device, test_point):
     c - corner velocity
     \ - torque-speed linear boundary between v and s
     each torque_speed_point will be tested in quadrant 3 and 4
-    ===========================================================
                             Torque
                              \  (+)
                                \ |
@@ -117,7 +106,6 @@ def test_dc_motor_clip(num_envs, num_joints, device, test_point):
                                 \s                          \
                                  |\                       8   \
                                 (-) \
-    ============================================================
     """
     effort_lim = 60
     saturation_effort = 100.0

@@ -34,9 +34,7 @@ class Se3Keyboard(DeviceBase):
     * gripper: a binary command to open or close the gripper.
 
     Key bindings:
-        ============================== ================= =================
         Description                    Key (+ve axis)    Key (-ve axis)
-        ============================== ================= =================
         Toggle gripper (open/close)    K
         Move along x-axis              W                 S
         Move along y-axis              A                 D
@@ -44,7 +42,6 @@ class Se3Keyboard(DeviceBase):
         Rotate along x-axis            Z                 X
         Rotate along y-axis            T                 G
         Rotate along z-axis            C                 V
-        ============================== ================= =================
 
     .. seealso::
 

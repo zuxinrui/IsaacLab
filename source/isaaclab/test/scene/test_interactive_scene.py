@@ -34,13 +34,7 @@ class MySceneCfg(InteractiveSceneCfg):
     # articulation
     robot = ArticulationCfg(
         prim_path="/World/envs/env_.*/Robot",
-<<<<<<< HEAD
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/IsaacSim/SimpleArticulation/revolute_articulation.usd"
-        ),
-=======
         spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Simple/revolute_articulation.usd"),
->>>>>>> 1e930f1dbeb (Fixes isaaclab.scene.reset_to to properly accept None as valid argument (#2970))
         actuators={
             "joint": ImplicitActuatorCfg(joint_names_expr=[".*"], stiffness=100.0, damping=1.0),
         },

@@ -301,9 +301,7 @@ class CuroboPlanner(MotionPlannerBase):
         # Only recompute when objects are added/removed, not when poses change
         self._cached_object_mappings: dict[str, str] | None = None
 
-    # =====================================================================================
     # DEVICE CONVERSION UTILITIES
-    # =====================================================================================
 
     def _to_curobo_device(self, tensor: torch.Tensor) -> torch.Tensor:
         """Convert tensor to cuRobo device for isolated device management.
@@ -334,9 +332,7 @@ class CuroboPlanner(MotionPlannerBase):
         """
         return tensor.to(device=self.env.device, dtype=tensor.dtype)
 
-    # =====================================================================================
     # INITIALIZATION AND CONFIGURATION
-    # =====================================================================================
 
     def _initialize_static_world(self) -> None:
         """Initialize static world geometry from USD stage.
@@ -366,9 +362,7 @@ class CuroboPlanner(MotionPlannerBase):
         # Initialize cuRobo world with static geometry
         self.motion_gen.update_world(self._static_world_config)
 
-    # =====================================================================================
     # PROPERTIES AND BASIC GETTERS
-    # =====================================================================================
 
     @property
     def attached_link(self) -> str:
@@ -385,9 +379,7 @@ class CuroboPlanner(MotionPlannerBase):
         """Current plan from cuRobo motion generator."""
         return self._current_plan
 
-    # =====================================================================================
     # WORLD AND OBJECT MANAGEMENT, ATTACHMENT, AND DETACHMENT
-    # =====================================================================================
 
     def get_object_pose(self, object_name: str) -> Pose | None:
         """Retrieve object pose from cuRobo's collision world model.
@@ -910,9 +902,7 @@ class CuroboPlanner(MotionPlannerBase):
         """
         return len(self.attached_objects) != 0
 
-    # =====================================================================================
     # JOINT STATE AND KINEMATICS
-    # =====================================================================================
 
     def _get_current_joint_state_for_curobo(self) -> JointState:
         """
@@ -986,9 +976,7 @@ class CuroboPlanner(MotionPlannerBase):
         kin_state: Any = self.motion_gen.rollout_fn.compute_kinematics(cuda_joint_state)
         return kin_state.ee_pose
 
-    # =====================================================================================
     # PLANNING CORE METHODS
-    # =====================================================================================
 
     def _make_pose(
         self,
@@ -1546,9 +1534,7 @@ class CuroboPlanner(MotionPlannerBase):
 
         return planned_poses
 
-    # =====================================================================================
     # VISUALIZATION METHODS
-    # =====================================================================================
 
     def _update_visualization_at_joint_positions(self, joint_positions: torch.Tensor) -> None:
         """Update sphere visualization for the robot at specific joint positions.
@@ -1739,9 +1725,7 @@ class CuroboPlanner(MotionPlannerBase):
 
         return is_attached
 
-    # =====================================================================================
     # HIGH-LEVEL PLANNING INTERFACE
-    # =====================================================================================
 
     def update_world_and_plan_motion(
         self,
@@ -1847,9 +1831,7 @@ class CuroboPlanner(MotionPlannerBase):
 
         return plan_success
 
-    # =====================================================================================
     # UTILITY METHODS
-    # =====================================================================================
 
     def _check_object_grasped(self, gripper_pos: torch.Tensor, object_name: str) -> bool:
         """Check if a specific object is currently grasped by the robot.

@@ -19,13 +19,8 @@ EXTENSION_TOML_DATA = toml.load(os.path.join(EXTENSION_PATH, "config", "extensio
 INSTALL_REQUIRES = [
     # generic
     "numpy<2",
-<<<<<<< HEAD
-    "torch>=2.7",
-    "onnx>=1.18.0",  # 1.16.2 throws access violation on Windows
-=======
     "torch>=2.5.1",
     "onnx==1.16.1",  # 1.16.2 throws access violation on Windows
->>>>>>> 7f15ff0f612 (Updates torch to 2.7.0 with cuda 12.8 blackwell support (#2998))
     "prettytable==3.3.0",
     "toml",
     # devices

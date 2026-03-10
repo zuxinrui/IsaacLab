@@ -59,8 +59,8 @@ class LynxArmCfg(ArticulationCfg):
                 "joint_5",
                 "joint_6",
             ],
-            stiffness=100000.0,
-            damping=10000.0,
+            stiffness=5000000.0,  # kp
+            damping=1.0,  # kd
         )
     }
 
@@ -108,8 +108,8 @@ class LynxArmTcpCfg(ArticulationCfg):
                 "joint_5",
                 "joint_6",
             ],
-            stiffness=100000.0,
-            damping=10000.0,
+            stiffness=5000000.0,
+            damping=1.0,
         )
     }
 

@@ -21,7 +21,6 @@ interpretation of the prim paths for different sensor types:
 
 +---------------------+---------------------------+---------------------------------------------------------------+
 | Sensor Type         | Example Prim Path         | Pre-check                                                     |
-+=====================+===========================+===============================================================+
 | Camera              | /World/robot/base/camera  | Leaf is available, and it will spawn a USD camera             |
 +---------------------+---------------------------+---------------------------------------------------------------+
 | Contact Sensor      | /World/robot/feet_*       | Leaf is available and checks if the schema exists             |

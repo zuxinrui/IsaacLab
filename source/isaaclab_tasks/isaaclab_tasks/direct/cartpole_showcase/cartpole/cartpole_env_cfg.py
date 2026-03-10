@@ -405,12 +405,9 @@ class DictBoxEnvCfg(CartpoleEnvCfg):
     """
     * Observation space (``~gymnasium.spaces.Dict`` with 2 constituent spaces)
 
-        ================  ===
         Key               Observation
-        ================  ===
         joint-positions   DOF positions
         joint-velocities  DOF velocities
-        ================  ===
 
     * Action space (``~gymnasium.spaces.Box`` with shape (1,))
 
@@ -435,12 +432,9 @@ class DictDiscreteEnvCfg(CartpoleEnvCfg):
     """
     * Observation space (``~gymnasium.spaces.Dict`` with 2 constituent spaces)
 
-        ================  ===
         Key               Observation
-        ================  ===
         joint-positions   DOF positions
         joint-velocities  DOF velocities
-        ================  ===
 
     * Action space (``~gymnasium.spaces.Discrete`` with 3 elements)
 
@@ -467,12 +461,9 @@ class DictMultiDiscreteEnvCfg(CartpoleEnvCfg):
     """
     * Observation space (``~gymnasium.spaces.Dict`` with 2 constituent spaces)
 
-        ================  ===
         Key               Observation
-        ================  ===
         joint-positions   DOF positions
         joint-velocities  DOF velocities
-        ================  ===
 
     * Action space (``~gymnasium.spaces.MultiDiscrete`` with 2 discrete spaces)
 

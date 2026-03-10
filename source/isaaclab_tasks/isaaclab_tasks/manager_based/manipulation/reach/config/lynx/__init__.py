@@ -57,7 +57,27 @@ gym.register(
     },
 )
 
-# this is designed for SAC on the real robot:
+gym.register(
+    id="Isaac-Reach-Lynx-Mujoco-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.joint_pos_relative_env_cfg:LynxReachMujocoEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LynxReachRslRlOnPolicyRunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_ppo_cfg.yaml",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+)
+
+gym.register(
+    id="Isaac-Reach-Lynx-Trapezoidal-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.trapezoidal_joint_pos_env_cfg:LynxReachTrapezoidalEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:LynxReachRslRlOnPolicyRunnerCfg",
+    },
+)
 gym.register(
     id="Isaac-Reach-Lynx-v5",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",

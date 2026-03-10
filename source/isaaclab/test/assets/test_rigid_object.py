@@ -232,11 +232,6 @@ def test_external_force_buffer(device):
             if step == 0 or step == 3:
                 # set a non-zero force
                 force = 1
-<<<<<<< HEAD
-            else:
-                # set a zero force
-                force = 0
-=======
                 position = 1
                 is_global = True
             else:
@@ -244,32 +239,12 @@ def test_external_force_buffer(device):
                 force = 0
                 position = 0
                 is_global = False
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
             # set force value
             external_wrench_b[:, :, 0] = force
             external_wrench_b[:, :, 3] = force
 
             # apply force
-<<<<<<< HEAD
-            cube_object.permanent_wrench_composer.set_forces_and_torques(
-                forces=external_wrench_b[..., :3],
-                torques=external_wrench_b[..., 3:],
-                body_ids=body_ids,
-            )
-
-            # check if the cube's force and torque buffers are correctly updated
-            for i in range(cube_object.num_instances):
-                assert cube_object._permanent_wrench_composer.composed_force_as_torch[i, 0, 0].item() == force
-                assert cube_object._permanent_wrench_composer.composed_torque_as_torch[i, 0, 0].item() == force
-
-            # Check if the instantaneous wrench is correctly added to the permanent wrench
-            cube_object.permanent_wrench_composer.add_forces_and_torques(
-                forces=external_wrench_b[..., :3],
-                torques=external_wrench_b[..., 3:],
-                body_ids=body_ids,
-            )
-=======
             if step == 0 or step == 3:
                 cube_object.set_external_force_and_torque(
                     external_wrench_b[..., :3],
@@ -291,7 +266,6 @@ def test_external_force_buffer(device):
             assert cube_object._external_torque_b[0, 0, 0].item() == force
             assert cube_object._external_wrench_positions_b[0, 0, 0].item() == position
             assert cube_object._use_global_wrench_frame == (step == 0 or step == 3)
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
             # apply action to the object
             cube_object.write_data_to_sim()

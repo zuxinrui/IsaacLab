@@ -1,17 +1,8 @@
-<<<<<<< HEAD
-# Copyright (c) 2024-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-=======
 # Copyright (c) 2024-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
->>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
 # All rights reserved.
 #
 # SPDX-License-Identifier: Apache-2.0
 
-<<<<<<< HEAD
-from collections.abc import Sequence
-
-=======
->>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
 import torch
 
 import isaaclab.utils.math as PoseUtils

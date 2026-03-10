@@ -152,9 +152,7 @@ def _distillation_runner(**kw):
     )
 
 
-# ===================================================================
 # rsl-rl < 4.0.0
-# ===================================================================
 class TestBelow4:
     def test_no_policy_raises(self):
         with pytest.raises(ValueError, match="policy"):
@@ -223,9 +221,7 @@ class TestBelow4:
         assert _is_missing(cfg.teacher)
 
 
-# ===================================================================
 # 4.0.0 <= rsl-rl < 5.0.0
-# ===================================================================
 class TestV4:
     # PPO tests
     def test_infers_mlp_actor_critic(self):
@@ -378,9 +374,7 @@ class TestV4:
         assert _is_missing(cfg.actor) and _is_missing(cfg.critic)
 
 
-# ===================================================================
 # rsl-rl >= 5.0.0
-# ===================================================================
 class TestV5:
     # Distribution tests
     def test_gaussian_from_stochastic(self):

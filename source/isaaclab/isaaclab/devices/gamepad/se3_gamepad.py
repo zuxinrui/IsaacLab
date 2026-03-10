@@ -34,9 +34,7 @@ class Se3Gamepad(DeviceBase):
     * gripper: a binary command to open or close the gripper.
 
     Stick and Button bindings:
-        ============================ ========================= =========================
         Description                  Stick/Button (+ve axis)   Stick/Button (-ve axis)
-        ============================ ========================= =========================
         Toggle gripper(open/close)   X Button                  X Button
         Move along x-axis            Left Stick Up             Left Stick Down
         Move along y-axis            Left Stick Left           Left Stick Right
@@ -44,7 +42,6 @@ class Se3Gamepad(DeviceBase):
         Rotate along x-axis          D-Pad Left                D-Pad Right
         Rotate along y-axis          D-Pad Down                D-Pad Up
         Rotate along z-axis          Right Stick Left          Right Stick Right
-        ============================ ========================= =========================
 
     .. seealso::
 

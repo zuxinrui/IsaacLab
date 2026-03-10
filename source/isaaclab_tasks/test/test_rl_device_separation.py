@@ -297,9 +297,7 @@ def _test_skrl_device_separation(sim_device: str, rl_device: str):
     env.close()
 
 
-# ============================================================================
 # Test Functions
-# ============================================================================
 
 
 def test_rsl_rl_device_separation_gpu_to_gpu():

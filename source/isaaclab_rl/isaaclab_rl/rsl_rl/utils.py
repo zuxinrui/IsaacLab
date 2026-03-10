@@ -60,6 +60,10 @@ def handle_deprecated_rsl_rl_cfg(agent_cfg: RslRlBaseRunnerCfg, installed_versio
                 )
             del agent_cfg.algorithm.optimizer
 
+        # remove share_cnn_encoders argument for PPO only available in rsl-rl >= 4.0.0
+        if hasattr(agent_cfg.algorithm, "share_cnn_encoders") and isinstance(agent_cfg.algorithm, RslRlPpoAlgorithmCfg):
+            del agent_cfg.algorithm.share_cnn_encoders
+
         # warn about model configurations only used in rsl-rl >= 4.0.0
         for model_name in _MODEL_CFG_NAMES:
             if _has_non_missing_attr(agent_cfg, model_name):

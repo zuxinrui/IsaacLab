@@ -143,12 +143,9 @@ class DictBoxEnvCfg(CartpoleCameraEnvCfg):
     """
     * Observation space (``~gymnasium.spaces.Dict`` with 2 constituent spaces)
 
-        ================  ===
         Key               Observation
-        ================  ===
         joint-velocities  DOF velocities
         camera            RGB image
-        ================  ===
 
     * Action space (``~gymnasium.spaces.Box`` with shape (1,))
 
@@ -179,12 +176,9 @@ class DictDiscreteEnvCfg(CartpoleCameraEnvCfg):
     """
     * Observation space (``~gymnasium.spaces.Dict`` with 2 constituent spaces)
 
-        ================  ===
         Key               Observation
-        ================  ===
         joint-velocities  DOF velocities
         camera            RGB image
-        ================  ===
 
     * Action space (``~gymnasium.spaces.Discrete`` with 3 elements)
 
@@ -217,12 +211,9 @@ class DictMultiDiscreteEnvCfg(CartpoleCameraEnvCfg):
     """
     * Observation space (``~gymnasium.spaces.Dict`` with 2 constituent spaces)
 
-        ================  ===
         Key               Observation
-        ================  ===
         joint-velocities  DOF velocities
         camera            RGB image
-        ================  ===
 
     * Action space (``~gymnasium.spaces.MultiDiscrete`` with 2 discrete spaces)
 

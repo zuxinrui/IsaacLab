@@ -213,19 +213,6 @@ class DCMotor(IdealPDActuator):
 
     A DC motor characteristics are defined by the following parameters:
 
-<<<<<<< HEAD
-    * No-load speed (:math:`\dot{q}_{motor, max}`) : The maximum-rated speed of the motor at
-      zero torque (:attr:`velocity_limit`).
-    * Stall torque (:math:`\tau_{motor, stall}`): The maximum-rated torque produced at
-      zero speed (:attr:`saturation_effort`).
-    * Continuous torque (:math:`\tau_{motor, con}`): The maximum torque that can be outputted for a short period.
-      This is often enforced on the current drives for a DC motor to limit overheating, prevent mechanical damage,
-      or enforced by electrical limitations (:attr:`effort_limit`).
-    * Corner velocity (:math:`V_{c}`): The velocity where the torque-speed curve intersects with continuous torque.
-
-    Based on these parameters, the instantaneous minimum and maximum torques for velocities between corner velocities
-    (where torque-speed curve intersects with continuous torque) are defined as follows:
-=======
     * No-load speed (:math:`\dot{q}_{motor, max}`) : The maximum-rated speed of the motor at 0 Torque (:attr:`velocity_limit`).
     * Stall torque (:math:`\tau_{motor, stall}`): The maximum-rated torque produced at 0 speed (:attr:`saturation_effort`).
     * Continuous torque (:math:`\tau_{motor, con}`): The maximum torque that can be outputted for a short period. This
@@ -236,7 +223,6 @@ class DCMotor(IdealPDActuator):
       (where torque-speed curve intersects with continuous torque) are defined as follows:
 
     Based on these parameters, the instantaneous minimum and maximum torques for velocities are defined as follows:
->>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
 
     .. math::
 
@@ -262,21 +248,12 @@ class DCMotor(IdealPDActuator):
     applied output torque will be driven to the Continuous Torque (`effort_limit`).
 
     The figure below demonstrates the clipping action for example (velocity, torque) pairs.
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
 
     .. figure:: ../../_static/actuator-group/dc_motor_clipping.jpg
         :align: center
         :figwidth: 100%
         :alt: The effort clipping as a function of joint velocity for a linear DC Motor.
 
-<<<<<<< HEAD
-=======
->>>>>>> b255b75263c (Fixes DCMotor clipping for negative power and adds actuator tests (#2300))
-=======
->>>>>>> 58f465a1877 (Fixes some of the errors while building the docs (#3050))
     """
 
     cfg: DCMotorCfg

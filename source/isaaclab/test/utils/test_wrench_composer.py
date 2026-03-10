@@ -407,9 +407,7 @@ def test_wrench_composer_reset(device: str, num_envs: int, num_bodies: int):
         assert np.allclose(composed_torque_np, np.zeros((num_envs, num_bodies, 3)), atol=1, rtol=1e-7)
 
 
-# ============================================================================
 # Global Frame Tests
-# ============================================================================
 
 
 @pytest.mark.parametrize("device", ["cuda:0", "cpu"])

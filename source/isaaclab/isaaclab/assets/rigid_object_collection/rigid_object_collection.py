@@ -577,15 +577,6 @@ class RigidObjectCollection(AssetBase):
             env_ids = wp.from_torch(env_ids.to(torch.int32), dtype=wp.int32)
         # -- object_ids
         if object_ids is None:
-<<<<<<< HEAD
-            object_ids = self._ALL_OBJ_INDICES_WP
-        elif isinstance(object_ids, slice):
-            object_ids = wp.from_torch(
-                torch.arange(self.num_objects, dtype=torch.int32, device=self.device)[object_ids], dtype=wp.int32
-            )
-        elif not isinstance(object_ids, torch.Tensor):
-            object_ids = wp.array(object_ids, dtype=wp.int32, device=self.device)
-=======
             object_ids = self._ALL_OBJ_INDICES
         # set into internal buffers
         self._external_force_b[env_ids[:, None], object_ids] = forces
@@ -601,7 +592,6 @@ class RigidObjectCollection(AssetBase):
         if positions is not None:
             self.uses_external_wrench_positions = True
             self._external_wrench_positions_b[env_ids[:, None], object_ids] = positions
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
         else:
             object_ids = wp.from_torch(object_ids.to(torch.int32), dtype=wp.int32)
 
@@ -729,11 +719,6 @@ class RigidObjectCollection(AssetBase):
         self._ALL_ENV_INDICES_WP = wp.from_torch(self._ALL_ENV_INDICES.to(torch.int32), dtype=wp.int32)
         self._ALL_OBJ_INDICES_WP = wp.from_torch(self._ALL_OBJ_INDICES.to(torch.int32), dtype=wp.int32)
 
-<<<<<<< HEAD
-        # external wrench composer
-        self._instantaneous_wrench_composer = WrenchComposer(self)
-        self._permanent_wrench_composer = WrenchComposer(self)
-=======
         # external forces and torques
         self.has_external_wrench = False
         self._external_force_b = torch.zeros((self.num_instances, self.num_objects, 3), device=self.device)
@@ -741,7 +726,6 @@ class RigidObjectCollection(AssetBase):
         self._external_wrench_positions_b = torch.zeros_like(self._external_force_b)
         self.uses_external_wrench_positions = False
         self._use_global_wrench_frame = False
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
         # set information about rigid body into data
         self._data.object_names = self.object_names

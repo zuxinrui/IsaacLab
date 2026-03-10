@@ -460,11 +460,6 @@ class RigidObject(AssetBase):
         # resolve all indices
         # -- env_ids
         if env_ids is None:
-<<<<<<< HEAD
-            env_ids = self._ALL_INDICES_WP
-        elif not isinstance(env_ids, torch.Tensor):
-            env_ids = wp.array(env_ids, dtype=wp.int32, device=self.device)
-=======
             env_ids = slice(None)
         # -- body_ids
         if body_ids is None:
@@ -486,7 +481,6 @@ class RigidObject(AssetBase):
         if positions is not None:
             self.uses_external_wrench_positions = True
             self._external_wrench_positions_b[env_ids, body_ids] = positions
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
         else:
             env_ids = wp.from_torch(env_ids.to(torch.int32), dtype=wp.int32)
         # -- body_ids
@@ -582,11 +576,6 @@ class RigidObject(AssetBase):
             torch.arange(self.num_bodies, dtype=torch.int32, device=self.device), dtype=wp.int32
         )
 
-<<<<<<< HEAD
-        # external wrench composer
-        self._instantaneous_wrench_composer = WrenchComposer(self)
-        self._permanent_wrench_composer = WrenchComposer(self)
-=======
         # external forces and torques
         self.has_external_wrench = False
         self._external_force_b = torch.zeros((self.num_instances, self.num_bodies, 3), device=self.device)
@@ -594,7 +583,6 @@ class RigidObject(AssetBase):
         self.uses_external_wrench_positions = False
         self._external_wrench_positions_b = torch.zeros_like(self._external_force_b)
         self._use_global_wrench_frame = False
->>>>>>> 2c59a882260 (Adds `is_global` flag for setting external wrenches on rigid bodies (#3052))
 
         # set information about rigid body into data
         self._data.body_names = self.body_names
