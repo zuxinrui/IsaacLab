@@ -1,0 +1,102 @@
+--- git status ---
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   scripts/lynx/lynx_random_control.py
+	modified:   scripts/lynx/readme.sh
+	modified:   source/isaaclab_assets/isaaclab_assets/robots/lynx.py
+	modified:   source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/reach/config/lynx/agents/rsl_rl_ppo_cfg.py
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/scripts/lynx/lynx_random_control.py b/scripts/lynx/lynx_random_control.py
+index 078e820d..f53c9c78 100644
+--- a/scripts/lynx/lynx_random_control.py
++++ b/scripts/lynx/lynx_random_control.py
+@@ -84,13 +84,23 @@ class LynxSceneCfg(InteractiveSceneCfg):
+                                       # For the Lynx robot, ensure 'source/isaaclab_assets/data/Robots/Lynx/lynx.usd'
+                                       # has ArticulationRootAPI applied to its root prim.  {ENV_REGEX_NS}
+             init_state=ArticulationCfg.InitialStateCfg(
++                # urdf robot:
++                # joint_pos={
++                #     "joint_1": 0.0,
++                #     "joint_2": 0.0,
++                #     "joint_3": 0.0,
++                #     "joint_4": 0.0,
++                #     "joint_5": 0.0,
++                #     "joint_6": 0.0,
++                # },
++                # mjcf robot:
+                 joint_pos={
+-                    "joint_1": 0.0,
+-                    "joint_2": 0.0,
+-                    "joint_3": 0.0,
+-                    "joint_4": 0.0,
+-                    "joint_5": 0.0,
+-                    "joint_6": 0.0,
++                    "joint1_joint": 0.0,
++                    "joint2_joint": 0.0,
++                    "joint3_joint": 0.0,
++                    "joint4_joint": 0.0,
++                    "joint5_joint": 0.0,
++                    "joint6_joint": 0.0,
+                 },
+                 # joint_pos={
+                 #     "shoulder_pan_joint": 0.0,
+@@ -103,7 +113,7 @@ class LynxSceneCfg(InteractiveSceneCfg):
+                 # pos=(0.0, 0.0, 0.8),
+                 ),
+             spawn=UsdFileCfg(
+-                usd_path="source/isaaclab_assets/data/Robots/Lynx/lynx-isaacsim2-urdf.usd",  # {ISAAC_NUCLEUS_DIR} / source/isaaclab_assets/data/
++                usd_path="source/isaaclab_assets/data/Robots/Lynx/lynx-mjcf.usd",  # {ISAAC_NUCLEUS_DIR} / source/isaaclab_assets/data/
+                 # usd_path=f"{ISAACLAB_NUCLEUS_DIR}/Robots/UniversalRobots/UR10/ur10_instanceable.usd",
+                 scale=(1.0, 1.0, 1.0),
+                 rigid_props=sim_utils.RigidBodyPropertiesCfg(
+diff --git a/scripts/lynx/readme.sh b/scripts/lynx/readme.sh
+index 0b3bba51..7dda003c 100644
+--- a/scripts/lynx/readme.sh
++++ b/scripts/lynx/readme.sh
+@@ -9,3 +9,9 @@
+ # 4. Save the asset.
+ 
+ # the final usd file for lynx urdf version: lynx-isaacsim2-urdf.usd
++
++# Distributed training via rsl_rl:
++python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v0 --distributed --headless --num_envs 16384
++
++
++
+diff --git a/source/isaaclab_assets/isaaclab_assets/robots/lynx.py b/source/isaaclab_assets/isaaclab_assets/robots/lynx.py
+index e0a0520d..2b4eb9e4 100644
+--- a/source/isaaclab_assets/isaaclab_assets/robots/lynx.py
++++ b/source/isaaclab_assets/isaaclab_assets/robots/lynx.py
+@@ -63,9 +63,10 @@ class LynxArmCfg(ArticulationCfg):
+     }
+ 
+     # end-effector link name
+-    end_effector_link_name: str = "ee_cylinder"
++    end_effector_link_name: str = "tool_link"
+     # end-effector site name
+     end_effector_site_name: str = "end_effector"
+ 
+ LYNX_CFG = LynxArmCfg()
+ LYNX_HD_CFG = LynxArmCfg()
++
+diff --git a/source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/reach/config/lynx/agents/rsl_rl_ppo_cfg.py b/source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/reach/config/lynx/agents/rsl_rl_ppo_cfg.py
+index da8aaa3e..1e875222 100644
+--- a/source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/reach/config/lynx/agents/rsl_rl_ppo_cfg.py
++++ b/source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/reach/config/lynx/agents/rsl_rl_ppo_cfg.py
+@@ -43,6 +43,6 @@ class LynxReachRslRlOnPolicyRunnerCfg(RslRlOnPolicyRunnerCfg):
+ 
+     num_steps_per_env = 24
+     max_iterations = 10000
+-    save_interval = 500
++    save_interval = 1000
+     experiment_name = "LynxReach"
+     empirical_normalization = True
+\ No newline at end of file

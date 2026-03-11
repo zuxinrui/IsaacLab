@@ -33,8 +33,10 @@ class LynxRobotCfg(ArticulationCfg):
     use_bspline: bool = True
     bspline_num_segments: int = 100
     bspline_end_point_pos: tuple = (0.0, 0.1, 0.3)
-    bspline_end_point_theta: float = 0.0
+    bspline_end_point_theta: float = 90.0
     bspline_dual_point_distance: float = 0.07
+    mounting_length_start: float = 0.04
+    mounting_length_end: float = 0.04
     
     # Geometric Parameters
     tube_radiuses: List[float] = [0.035] * 5  # [0.0396] * 5
@@ -47,8 +49,8 @@ class LynxRobotCfg(ArticulationCfg):
     actuators: dict[str, ImplicitActuatorCfg] = {
         "lynx_arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_.*"],
-            stiffness=5000.0,
-            damping=100.0,
+            stiffness=5000000.0,
+            damping=1.0,
         )
     }
     
@@ -223,8 +225,10 @@ class LynxUsdConstructor:
                     # B-Spline Tube Logic
                     num_segs = self.cfg.bspline_num_segments
                     end_pos = Gf.Vec3f(*self.cfg.bspline_end_point_pos)
-                    theta = self.cfg.bspline_end_point_theta
+                    theta = np.radians(self.cfg.bspline_end_point_theta)
                     d = self.cfg.bspline_dual_point_distance
+                    mounting_l_start = self.cfg.mounting_length_start
+                    mounting_l_end = self.cfg.mounting_length_end
                     
                     # Offsets for joint volumes
                     pre_joint_r = joint_params[i-1]["r2"] if i > 0 else 0.08
@@ -238,8 +242,10 @@ class LynxUsdConstructor:
                     s, c = np.sin(theta), np.cos(theta)
                     t_dir = Gf.Vec3f(0, s, c).GetNormalized()
                     
-                    # Offset end point by joint volumes
-                    p3 = end_pos - Gf.Vec3f(0, 0, pre_joint_r) - t_dir * next_joint_r
+                    # Offset end point by joint volumes and mounting lengths
+                    start_offset = pre_joint_r + mounting_l_start
+                    end_offset = next_joint_r + mounting_l_end
+                    p3 = end_pos - Gf.Vec3f(0, 0, start_offset) - t_dir * end_offset
                     p2 = p3 - t_dir * d
                     
                     # Sample points along the curve (Cubic Bezier)
@@ -249,68 +255,65 @@ class LynxUsdConstructor:
                         pt = (1-t)**3 * p0 + 3*(1-t)**2*t * p1 + 3*(1-t)*t**2 * p2 + t**3 * p3
                         curve_points.append(pt)
                     
+                    # Calculate start direction for mounting offset
+                    start_direction = (curve_points[1] - curve_points[0]).GetNormalized()
+                    # first segment will be extended backwards along the curve's initial tangent
+                    start_offset_vec = start_direction * (mounting_l_start - (curve_points[1] - curve_points[0]).GetLength())
+
                     # Create segments
                     last_seg_quat = Gf.Quatf(1, 0, 0, 0)
+                    actual_end_pos = p3
                     for j in range(num_segs):
-                        seg_start = curve_points[j]
-                        seg_end = curve_points[j+1]
-                        seg_dir = (seg_end - seg_start)
-                        seg_len = seg_dir.GetLength()
-                        if seg_len < 1e-6: continue
-                        seg_dir /= seg_len
-                        
-                        seg_center = (seg_start + seg_end) * 0.5
-                        
-                        # Rotation from Z to seg_dir
-                        z_axis = Gf.Vec3f(0, 0, 1)
-                        dot = z_axis * seg_dir
-                        if abs(dot) > 0.9999:
-                            seg_quat = Gf.Quatf(1, 0, 0, 0) if dot > 0 else Gf.Quatf(0, 1, 0, 0)
-                        else:
-                            axis = (z_axis ^ seg_dir).GetNormalized()
-                            angle = np.rad2deg(np.arccos(np.clip(dot, -1.0, 1.0)))
-                            seg_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(axis), angle).GetQuat())
-                        
-                        last_seg_quat = seg_quat
+                        p_start = curve_points[j]
+                        p_end = curve_points[j+1]
+                        direction = (p_end - p_start).GetNormalized()
+                        auto_length = (p_end - p_start).GetLength()
                         
                         is_first = (j == 0)
                         is_last = (j == num_segs - 1)
                         
-                        if is_first or is_last:
-                            # Use STL for first and last segments (clamps)
-                            mesh_pos = seg_center
-                            mesh_quat = seg_quat
-                            if is_last:
-                                # Rotate 180 around X for "upside down" clamp
-                                mesh_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(1, 0, 0), 180).GetQuat()) * seg_quat
-                            
-                            sim_utils.create_prim(
-                                f"{tube_path}/visual_{j}",
-                                prim_type="Xform",
-                                translation=tuple(mesh_pos),
-                                orientation=self._quat_to_tuple(mesh_quat)
-                            )
-                            # Use create_prim with usd_path to reference the STL
-                            sim_utils.create_prim(
-                                f"{tube_path}/visual_{j}/mesh",
-                                usd_path=self.cfg.clamp_stl,
-                                scale=(0.001, 0.001, 0.001)
-                            )
+                        if is_first:
+                            seg_len = mounting_l_start
+                            seg_center = p_start + direction * (seg_len / 2)
+                        elif is_last:
+                            seg_len = mounting_l_end
+                            shifted_start = p_start + start_offset_vec
+                            seg_center = shifted_start + direction * (seg_len / 2)
                         else:
-                            sim_utils.spawners.meshes.spawn_mesh_cylinder(
-                                f"{tube_path}/visual_{j}",
-                                sim_utils.spawners.MeshCylinderCfg(
-                                    radius=tube_radius,
-                                    height=seg_len,
-                                    visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
-                                ),
-                                translation=tuple(seg_center),
-                                orientation=self._quat_to_tuple(seg_quat)
-                            )
+                            seg_len = auto_length
+                            shifted_start = p_start + start_offset_vec
+                            shifted_end = p_end + start_offset_vec
+                            seg_center = (shifted_start + shifted_end) * 0.5
+                        
+                        # Rotation from Z to direction
+                        z_axis = Gf.Vec3f(0, 0, 1)
+                        dot = z_axis * direction
+                        if abs(dot) > 0.9999:
+                            seg_quat = Gf.Quatf(1, 0, 0, 0) if dot > 0 else Gf.Quatf(0, 1, 0, 0)
+                        else:
+                            axis = (z_axis ^ direction).GetNormalized()
+                            angle = np.rad2deg(np.arccos(np.clip(dot, -1.0, 1.0)))
+                            seg_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(axis), angle).GetQuat())
+                        
+                        last_seg_quat = seg_quat
+                        if is_last:
+                            shifted_start = p_start + start_offset_vec
+                            actual_end_pos = shifted_start + direction * seg_len
+
+                        sim_utils.spawners.meshes.spawn_mesh_cylinder(
+                            f"{tube_path}/visual_{j}",
+                            sim_utils.spawners.MeshCylinderCfg(
+                                radius=tube_radius,
+                                height=seg_len,
+                                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
+                            ),
+                            translation=tuple(seg_center),
+                            orientation=self._quat_to_tuple(seg_quat)
+                        )
                     
                     self._create_fixed_joint(f"{tube_path}/fixed_joint", curr_parent_path, tube_path, curr_pos, curr_quat)
                     curr_parent_path = tube_path
-                    curr_pos = p3
+                    curr_pos = actual_end_pos
                     curr_quat = last_seg_quat
                     
                 else:
@@ -492,7 +495,7 @@ class LynxUsdConstructor:
 
             # Apply Drive API
             drive = UsdPhysics.DriveAPI.Apply(stage.GetPrimAtPath(f"{link_path}/{joint_name}"), "revolute")
-            drive.CreateTypeAttr("force")
+            drive.CreateTypeAttr("position")
             drive.CreateStiffnessAttr(self.cfg.actuators["lynx_arm"].stiffness)
             drive.CreateDampingAttr(self.cfg.actuators["lynx_arm"].damping)
 

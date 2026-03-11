@@ -55,6 +55,10 @@ class LynxSceneCfg(InteractiveSceneCfg):
         genotype_tube=[0, 1, 0, 1, 0],
         genotype_joints=1
     )
+    # Increase stiffness and damping for more rigid behavior
+    robot.actuators["lynx_arm"].stiffness = 5000000.0
+    robot.actuators["lynx_arm"].damping = 1000000.0
+    
     # Ensure the spawn function is set and has the robot_cfg
     robot.spawn.func = LynxUsdConstructor.spawn
     # Use a dictionary to avoid recursion in configclass validation
@@ -101,6 +105,7 @@ class LynxTrapezoidalTestEnvCfg(ManagerBasedEnvCfg):
 
         # Simulation settings
         self.sim.dt = 1.0 / 120.0  # 120 Hz
+        self.sim.gravity = (0.0, 0.0, 9.81)
         self.decimation = 24       # 5 Hz policy frequency
         self.sim.render_interval = 2 # 60 Hz rendering/control update (approx)
 
@@ -128,12 +133,9 @@ def main():
 
     # Simulate
     while simulation_app.is_running():
-        if step_count % steps_per_target == 0:
-            # Generate random target in range [-10, 10] degrees
-            # Convert to radians: 10 degrees = 0.1745 radians
-            range_rad = math.radians(10.0)
-            current_target = (torch.rand((env.num_envs, num_joints), device=env.device) * 2.0 - 1.0) * range_rad
-            print(f"[INFO]: Commanding new random target (degrees): {torch.rad2deg(current_target)}")
+        range_rad = math.radians(10.0)
+        current_target = (torch.rand((env.num_envs, num_joints), device=env.device) * 2.0 - 1.0) * range_rad
+        print(f"[INFO]: Commanding new random target (degrees): {torch.rad2deg(current_target)}")
         
         # Step environment (this calls process_action and apply_action)
         env.step(current_target)
