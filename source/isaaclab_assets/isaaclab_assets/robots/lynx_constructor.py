@@ -18,6 +18,7 @@ from pxr import Usd, UsdGeom, UsdPhysics, Gf
 class LynxUsdConstructorSpawnerCfg(sim_utils.SpawnerCfg):
     """Configuration for the Lynx USD constructor spawner."""
     func: Any = None # Will be set to LynxUsdConstructor.spawn
+    robot_cfg: Optional[Any] = None
 
 @configclass
 class LynxRobotCfg(ArticulationCfg):
@@ -46,8 +47,8 @@ class LynxRobotCfg(ArticulationCfg):
     actuators: dict[str, ImplicitActuatorCfg] = {
         "lynx_arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_.*"],
-            stiffness=5000000.0,
-            damping=1.0,
+            stiffness=5000.0,
+            damping=100.0,
         )
     }
     
@@ -58,7 +59,7 @@ class LynxUsdConstructor:
     """Procedural constructor for the Lynx manipulator in USD."""
 
     @staticmethod
-    def spawn(prim_path: str, cfg: LynxRobotCfg, translation: Optional[tuple] = None, orientation: Optional[tuple] = None):
+    def spawn(prim_path: str, cfg: LynxUsdConstructorSpawnerCfg, translation: Optional[tuple] = None, orientation: Optional[tuple] = None):
         """Spawns the robot at the specified prim path.
         
         Args:
@@ -67,16 +68,26 @@ class LynxUsdConstructor:
             translation: The translation of the robot.
             orientation: The orientation of the robot.
         """
-        # If orientation is not provided, rotate 90 degrees around X to align with Z axis
-        # if orientation is None:
-        #     # Rotation of 90 degrees around X-axis: (w=0.707, x=0.707, y=0, z=0)
-        #     # This converts the Y-up orientation to Z-up
-        #     orientation = (0.7071068, 0.7071068, 0.0, 0.0)
+        # If prim_path is empty or None, use a default path
+        if not prim_path:
+            prim_path = "/World/Robot"
         
-        # # If translation is not provided, set a default height to keep it above the horizon
-        # if translation is None:
-        #     translation = (0.0, 0.0, 0.5)
-
+        # Handle regex paths by taking the first matching path or a default if none match yet
+        if "{ENV_REGEX_NS}" in prim_path:
+            # This is a template path, we should probably let the caller handle it
+            # but if we are here, it means the spawner was called with the template
+            # In Isaac Lab, the InteractiveScene usually resolves this before calling spawn
+            # If it didn't, we might be in a single-env setup or something similar
+            prim_path = prim_path.replace("{ENV_REGEX_NS}", "/World/envs/env_0")
+        
+        # Fix for the "Ill-formed SdfPath" error which causes DefinePrim to fail with empty path
+        if ".*" in prim_path:
+            # Replace regex with a concrete index for spawning
+            import re
+            prim_path = re.sub(r"env_\.\*", "env_0", prim_path)
+            
+        print(f"[DEBUG] LynxUsdConstructor.spawn called with prim_path: '{prim_path}'")
+            
         # Create the root Xform
         sim_utils.create_prim(prim_path, prim_type="Xform", translation=translation, orientation=orientation)
         
@@ -86,7 +97,27 @@ class LynxUsdConstructor:
         UsdPhysics.ArticulationRootAPI.Apply(root_prim)
         
         # Build the robot chain
-        constructor = LynxUsdConstructor(cfg)
+        if hasattr(cfg, "robot_cfg") and cfg.robot_cfg is not None:
+            robot_cfg = cfg.robot_cfg
+            if isinstance(robot_cfg, dict):
+                # Convert dict back to LynxRobotCfg if needed, or just use it
+                # The constructor expects LynxRobotCfg
+                robot_cfg_obj = LynxRobotCfg()
+                for k, v in robot_cfg.items():
+                    if k != "prim_path":
+                        setattr(robot_cfg_obj, k, v)
+                robot_cfg = robot_cfg_obj
+            constructor = LynxUsdConstructor(robot_cfg)
+        elif isinstance(cfg, LynxRobotCfg):
+            constructor = LynxUsdConstructor(cfg)
+        else:
+            # Fallback for other cases
+            # If cfg is LynxUsdConstructorSpawnerCfg but doesn't have robot_cfg,
+            # we might be in trouble, but let's try to use it as is or fallback to default
+            try:
+                constructor = LynxUsdConstructor(cfg)
+            except Exception:
+                constructor = LynxUsdConstructor(LynxRobotCfg())
         constructor._build_chain(prim_path)
         
         return root_prim
@@ -107,6 +138,8 @@ class LynxUsdConstructor:
         sim_utils.create_prim(base_path, prim_type="Xform")
         base_prim = stage.GetPrimAtPath(base_path)
         UsdPhysics.RigidBodyAPI.Apply(base_prim)
+        # Add mass to base
+        UsdPhysics.MassAPI.Apply(base_prim).CreateMassAttr(1.0)
         
         # Fix the base to the world (root Xform)
         fixed_base_joint = UsdPhysics.FixedJoint.Define(stage, f"{base_path}/root_fixed_joint")
@@ -308,6 +341,9 @@ class LynxUsdConstructor:
             sim_utils.create_prim(link_path, prim_type="Xform")
             link_prim = stage.GetPrimAtPath(link_path)
             UsdPhysics.RigidBodyAPI.Apply(link_prim)
+            # Add mass to the link to prevent it from being treated as massless
+            mass_api = UsdPhysics.MassAPI.Apply(link_prim)
+            mass_api.CreateMassAttr(0.1) # 100g per link as a placeholder
             
             p = joint_params[i]
             j_type = joint_types[i]
@@ -465,7 +501,9 @@ class LynxUsdConstructor:
         ee_cyl_radius = 0.010
         ee_cyl_path = f"{root_path}/ee_cylinder"
         sim_utils.create_prim(ee_cyl_path, prim_type="Xform")
-        UsdPhysics.RigidBodyAPI.Apply(stage.GetPrimAtPath(ee_cyl_path))
+        ee_cyl_prim = stage.GetPrimAtPath(ee_cyl_path)
+        UsdPhysics.RigidBodyAPI.Apply(ee_cyl_prim)
+        UsdPhysics.MassAPI.Apply(ee_cyl_prim).CreateMassAttr(0.05)
         
         sim_utils.spawners.meshes.spawn_mesh_cylinder(
             f"{ee_cyl_path}/visual",
@@ -480,7 +518,9 @@ class LynxUsdConstructor:
         # Final EE
         ee_path = f"{root_path}/ee"
         sim_utils.create_prim(ee_path, prim_type="Xform")
-        UsdPhysics.RigidBodyAPI.Apply(stage.GetPrimAtPath(ee_path))
+        ee_prim = stage.GetPrimAtPath(ee_path)
+        UsdPhysics.RigidBodyAPI.Apply(ee_prim)
+        UsdPhysics.MassAPI.Apply(ee_prim).CreateMassAttr(0.05)
         
         sim_utils.spawners.meshes.spawn_mesh_cuboid(
             f"{ee_path}/visual",

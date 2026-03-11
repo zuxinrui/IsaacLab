@@ -25,7 +25,9 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v3
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v4 --num_envs 1024
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v4 --num_envs 16384 --headless
 
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Mujoco-v0 --num_envs 1024
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Mujoco-v0 --num_envs 1024  # Isaac-Lift-Cube-OpenArm-v0
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Lift-Cube-Franka-v0 --num_envs 1024
+
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Trapezoidal-v0 --num_envs 1024 --headless
 

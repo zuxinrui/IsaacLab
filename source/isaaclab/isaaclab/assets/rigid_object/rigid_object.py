@@ -584,6 +584,10 @@ class RigidObject(AssetBase):
         self._external_wrench_positions_b = torch.zeros_like(self._external_force_b)
         self._use_global_wrench_frame = False
 
+        # wrench composers
+        self._instantaneous_wrench_composer = WrenchComposer(self)
+        self._permanent_wrench_composer = WrenchComposer(self)
+
         # set information about rigid body into data
         self._data.body_names = self.body_names
         self._data.default_mass = self.root_physx_view.get_masses().clone()
