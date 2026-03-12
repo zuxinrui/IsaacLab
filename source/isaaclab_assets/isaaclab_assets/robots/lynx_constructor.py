@@ -12,13 +12,15 @@ from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import ArticulationCfg
 from isaaclab.utils import configclass
 
-from pxr import Usd, UsdGeom, UsdPhysics, Gf
+from pxr import PhysxSchema, Usd, UsdGeom, UsdPhysics, Gf
 
 @configclass
 class LynxUsdConstructorSpawnerCfg(sim_utils.SpawnerCfg):
     """Configuration for the Lynx USD constructor spawner."""
     func: Any = None # Will be set to LynxUsdConstructor.spawn
     robot_cfg: Optional[Any] = None
+    rigid_props: sim_utils.RigidBodyPropertiesCfg = sim_utils.RigidBodyPropertiesCfg()
+    articulation_props: sim_utils.ArticulationRootPropertiesCfg = sim_utils.ArticulationRootPropertiesCfg()
 
 @configclass
 class LynxRobotCfg(ArticulationCfg):
@@ -49,13 +51,26 @@ class LynxRobotCfg(ArticulationCfg):
     actuators: dict[str, ImplicitActuatorCfg] = {
         "lynx_arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_.*"],
-            stiffness=5000000.0,
-            damping=1.0,
+            effort_limit_sim=100000.0,
+            velocity_limit_sim=100.0,
+            stiffness=20000.0,
+            damping=4000.0,
         )
     }
+
+    init_state: ArticulationCfg.InitialStateCfg = ArticulationCfg.InitialStateCfg(
+        joint_pos={
+            "joint_1": 0.0,
+            "joint_2": -0.45,
+            "joint_3": 0.9,
+            "joint_4": 0.0,
+            "joint_5": 0.6,
+            "joint_6": 0.0,
+        },
+    )
     
     # Spawning logic
-    spawn: sim_utils.SpawnerCfg = LynxUsdConstructorSpawnerCfg()
+    spawn: LynxUsdConstructorSpawnerCfg = LynxUsdConstructorSpawnerCfg()
 
 class LynxUsdConstructor:
     """Procedural constructor for the Lynx manipulator in USD."""
@@ -98,6 +113,10 @@ class LynxUsdConstructor:
         root_prim = stage.GetPrimAtPath(prim_path)
         UsdPhysics.ArticulationRootAPI.Apply(root_prim)
         
+        # Apply articulation properties if provided
+        if hasattr(cfg, "articulation_props") and cfg.articulation_props is not None:
+            sim_utils.define_articulation_root_properties(prim_path, cfg.articulation_props)
+        
         # Build the robot chain
         if hasattr(cfg, "robot_cfg") and cfg.robot_cfg is not None:
             robot_cfg = cfg.robot_cfg
@@ -108,6 +127,11 @@ class LynxUsdConstructor:
                 for k, v in robot_cfg.items():
                     if k != "prim_path":
                         setattr(robot_cfg_obj, k, v)
+                # Manually set spawn properties from dict if they exist
+                if "rigid_props" in robot_cfg:
+                    robot_cfg_obj.spawn.rigid_props = robot_cfg["rigid_props"]
+                if "articulation_props" in robot_cfg:
+                    robot_cfg_obj.spawn.articulation_props = robot_cfg["articulation_props"]
                 robot_cfg = robot_cfg_obj
             constructor = LynxUsdConstructor(robot_cfg)
         elif isinstance(cfg, LynxRobotCfg):
@@ -116,10 +140,7 @@ class LynxUsdConstructor:
             # Fallback for other cases
             # If cfg is LynxUsdConstructorSpawnerCfg but doesn't have robot_cfg,
             # we might be in trouble, but let's try to use it as is or fallback to default
-            try:
-                constructor = LynxUsdConstructor(cfg)
-            except Exception:
-                constructor = LynxUsdConstructor(LynxRobotCfg())
+            constructor = LynxUsdConstructor(LynxRobotCfg())
         constructor._build_chain(prim_path)
         
         return root_prim
@@ -131,18 +152,124 @@ class LynxUsdConstructor:
         """Helper to convert Gf.Quatf to tuple (w, x, y, z)."""
         return (q.GetReal(), *q.GetImaginary())
 
+    def _apply_mass_properties(
+        self,
+        prim,
+        mass: float,
+        diagonal_inertia: tuple[float, float, float],
+        center_of_mass: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        principal_axes: Gf.Quatf | None = None,
+    ):
+        """Apply explicit mass, center of mass and inertia to a rigid body prim."""
+        mass_api = UsdPhysics.MassAPI.Apply(prim)
+        mass_api.CreateMassAttr(mass)
+        mass_api.CreateCenterOfMassAttr().Set(Gf.Vec3f(*center_of_mass))
+        mass_api.CreateDiagonalInertiaAttr().Set(Gf.Vec3f(*diagonal_inertia))
+        mass_api.CreatePrincipalAxesAttr().Set(principal_axes if principal_axes is not None else Gf.Quatf(1, 0, 0, 0))
+
+    def _cylinder_inertia(self, mass: float, radius: float, length: float, axis: str = "z") -> tuple[float, float, float]:
+        """Approximate solid-cylinder inertia around its center of mass."""
+        i_axial = 0.5 * mass * radius * radius
+        i_radial = (1.0 / 12.0) * mass * (3.0 * radius * radius + length * length)
+        if axis == "x":
+            return (i_axial, i_radial, i_radial)
+        if axis == "y":
+            return (i_radial, i_axial, i_radial)
+        return (i_radial, i_radial, i_axial)
+
+    def _box_inertia(self, mass: float, size: tuple[float, float, float]) -> tuple[float, float, float]:
+        """Approximate cuboid inertia around its center of mass."""
+        sx, sy, sz = size
+        return (
+            (1.0 / 12.0) * mass * (sy * sy + sz * sz),
+            (1.0 / 12.0) * mass * (sx * sx + sz * sz),
+            (1.0 / 12.0) * mass * (sx * sx + sy * sy),
+        )
+
+    def _parallel_axis(self, inertia: tuple[float, float, float], mass: float, offset: Gf.Vec3f) -> tuple[float, float, float]:
+        """Shift diagonal inertia with the parallel-axis theorem."""
+        ox, oy, oz = float(offset[0]), float(offset[1]), float(offset[2])
+        return (
+            inertia[0] + mass * (oy * oy + oz * oz),
+            inertia[1] + mass * (ox * ox + oz * oz),
+            inertia[2] + mass * (ox * ox + oy * oy),
+        )
+
+    def _combine_bodies(
+        self,
+        components: list[tuple[float, tuple[float, float, float], Gf.Vec3f]],
+    ) -> tuple[float, tuple[float, float, float], tuple[float, float, float]]:
+        """Combine mass properties of multiple aligned primitive approximations."""
+        total_mass = sum(component[0] for component in components)
+        if total_mass <= 0.0:
+            return 0.0, (1e-6, 1e-6, 1e-6), (0.0, 0.0, 0.0)
+
+        com = Gf.Vec3f(0.0, 0.0, 0.0)
+        for mass, _, offset in components:
+            com += offset * (mass / total_mass)
+
+        total_inertia = [0.0, 0.0, 0.0]
+        for mass, inertia, offset in components:
+            shifted = self._parallel_axis(inertia, mass, offset - com)
+            for idx in range(3):
+                total_inertia[idx] += shifted[idx]
+
+        return total_mass, (float(total_inertia[0]), float(total_inertia[1]), float(total_inertia[2])), (float(com[0]), float(com[1]), float(com[2]))
+
+    def _set_joint_limits(self, joint, lower_deg: float, upper_deg: float):
+        """Apply conservative rotational joint limits in degrees."""
+        joint.CreateLowerLimitAttr(lower_deg)
+        joint.CreateUpperLimitAttr(upper_deg)
+
+    def _set_joint_drive_and_damping(self, joint_prim, joint_index: int):
+        """Apply drive plus passive joint properties."""
+        actuator_cfg = self.cfg.actuators["lynx_arm"]
+        drive = UsdPhysics.DriveAPI.Apply(joint_prim, "revolute")
+        drive.CreateTypeAttr("position")
+        if drive.GetStiffnessAttr().HasAuthoredValueOpinion():
+            drive.GetStiffnessAttr().Set(actuator_cfg.stiffness)
+        else:
+            drive.CreateStiffnessAttr(actuator_cfg.stiffness)
+        if drive.GetDampingAttr().HasAuthoredValueOpinion():
+            drive.GetDampingAttr().Set(actuator_cfg.damping)
+        else:
+            drive.CreateDampingAttr(actuator_cfg.damping)
+        if actuator_cfg.effort_limit_sim is not None:
+            if drive.GetMaxForceAttr().HasAuthoredValueOpinion():
+                drive.GetMaxForceAttr().Set(actuator_cfg.effort_limit_sim)
+            else:
+                drive.CreateMaxForceAttr(actuator_cfg.effort_limit_sim)
+
+        joint_physx_api = PhysxSchema.PhysxJointAPI.Apply(joint_prim)
+        armature_value = 0.4 if joint_index < 3 else 0.12
+        if joint_physx_api.GetArmatureAttr().HasAuthoredValueOpinion():
+            joint_physx_api.GetArmatureAttr().Set(armature_value)
+        else:
+            joint_physx_api.CreateArmatureAttr(armature_value)
+        if joint_physx_api.GetJointFrictionAttr().HasAuthoredValueOpinion():
+            joint_physx_api.GetJointFrictionAttr().Set(0.0)
+        else:
+            joint_physx_api.CreateJointFrictionAttr(0.0)
+        if actuator_cfg.velocity_limit_sim is not None:
+            if joint_physx_api.GetMaxJointVelocityAttr().HasAuthoredValueOpinion():
+                joint_physx_api.GetMaxJointVelocityAttr().Set(actuator_cfg.velocity_limit_sim)
+            else:
+                joint_physx_api.CreateMaxJointVelocityAttr(actuator_cfg.velocity_limit_sim)
+
+        return drive, joint_physx_api
+
     def _build_chain(self, root_path: str):
         """Internal logic to assemble the links and joints."""
         stage = sim_utils.get_current_stage()
         
         # 1. Base Link
         base_path = f"{root_path}/base"
-        sim_utils.create_prim(base_path, prim_type="Xform")
+        sim_utils.create_prim(base_path, prim_type="Xform", translation=(0.0, 0.0, 0.02))
         base_prim = stage.GetPrimAtPath(base_path)
         UsdPhysics.RigidBodyAPI.Apply(base_prim)
-        # Add mass to base
-        UsdPhysics.MassAPI.Apply(base_prim).CreateMassAttr(1.0)
-        
+        # Apply rigid body properties if provided
+        if hasattr(self.cfg.spawn, "rigid_props") and self.cfg.spawn.rigid_props is not None:
+            sim_utils.define_rigid_body_properties(base_path, self.cfg.spawn.rigid_props)
         # Fix the base to the world (root Xform)
         fixed_base_joint = UsdPhysics.FixedJoint.Define(stage, f"{base_path}/root_fixed_joint")
         fixed_base_joint.CreateBody0Rel().SetTargets([root_path])
@@ -158,26 +285,36 @@ class LynxUsdConstructor:
         base_radius1 = 0.08
         base_length2 = 0.017 + 0.001
         base_radius2 = 0.08
+        base_mass = 6.0
+        base_height = base_length1 + base_length2
+        base_radius = max(base_radius1, base_radius2)
+        self._apply_mass_properties(
+            base_prim,
+            mass=base_mass,
+            diagonal_inertia=self._cylinder_inertia(base_mass, base_radius, base_height, axis="z"),
+            center_of_mass=(0.0, 0.0, base_height / 2.0),
+        )
         
-        # Add base visuals
-        # Base is upright: visual_1 at z=base_length1/2, visual_2 at z=base_length1 + base_length2/2
+        # Use collision-only geometry on the same prim names as visuals to avoid duplicate flashing meshes.
         sim_utils.spawners.meshes.spawn_mesh_cylinder(
             f"{base_path}/visual_1",
             sim_utils.spawners.MeshCylinderCfg(
                 radius=base_radius1,
                 height=base_length1,
-                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                collision_props=sim_utils.CollisionPropertiesCfg(),
+                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0)),
             ),
-            translation=(0, 0, base_length1 / 2)
+            translation=(0, 0, base_length1 / 2),
         )
         sim_utils.spawners.meshes.spawn_mesh_cylinder(
             f"{base_path}/visual_2",
             sim_utils.spawners.MeshCylinderCfg(
                 radius=base_radius2,
                 height=base_length2,
-                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                collision_props=sim_utils.CollisionPropertiesCfg(),
+                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0)),
             ),
-            translation=(0, 0, base_length1 + base_length2 / 2)
+            translation=(0, 0, base_length1 + base_length2 / 2),
         )
 
         curr_parent_path = base_path
@@ -209,6 +346,10 @@ class LynxUsdConstructor:
             {"l0": 0.029, "r0": 0.04, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
         ]
 
+        joint_limits_deg = [(-170.0, 170.0), (-120.0, 120.0), (-120.0, 120.0), (-180.0, 180.0), (-120.0, 120.0), (-180.0, 180.0)]
+        link_target_masses = [2.8, 2.6, 1.9, 1.2, 0.9, 0.6]
+        tube_target_masses = [0.0, 0.35, 0.0, 0.22, 0.0]
+
         tube_idx = 0
         for i in range(num_joints):
             # 1. Check if we need to insert a tube BEFORE this joint (except joint 1)
@@ -218,6 +359,7 @@ class LynxUsdConstructor:
                 sim_utils.create_prim(tube_path, prim_type="Xform")
                 tube_prim = stage.GetPrimAtPath(tube_path)
                 UsdPhysics.RigidBodyAPI.Apply(tube_prim)
+                # Add explicit mass/inertia to the tube after geometry is known
                 
                 tube_radius = self.cfg.tube_radiuses[tube_idx]
                 
@@ -305,13 +447,22 @@ class LynxUsdConstructor:
                             sim_utils.spawners.MeshCylinderCfg(
                                 radius=tube_radius,
                                 height=seg_len,
-                                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
+                                collision_props=sim_utils.CollisionPropertiesCfg(),
+                                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1)),
                             ),
                             translation=tuple(seg_center),
                             orientation=self._quat_to_tuple(seg_quat)
                         )
                     
                     self._create_fixed_joint(f"{tube_path}/fixed_joint", curr_parent_path, tube_path, curr_pos, curr_quat)
+                    approx_length = max((actual_end_pos - Gf.Vec3f(0.0, 0.0, 0.0)).GetLength(), 0.08)
+                    tube_mass = tube_target_masses[tube_idx]
+                    self._apply_mass_properties(
+                        tube_prim,
+                        mass=tube_mass,
+                        diagonal_inertia=self._cylinder_inertia(tube_mass, tube_radius, approx_length, axis="z"),
+                        center_of_mass=(0.0, 0.0, approx_length / 2.0),
+                    )
                     curr_parent_path = tube_path
                     curr_pos = actual_end_pos
                     curr_quat = last_seg_quat
@@ -324,11 +475,19 @@ class LynxUsdConstructor:
                         sim_utils.spawners.MeshCylinderCfg(
                             radius=tube_radius,
                             height=tube_length,
+                            collision_props=sim_utils.CollisionPropertiesCfg(),
                             visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
                         ),
                         translation=(0, 0, tube_length / 2)
                     )
                     self._create_fixed_joint(f"{tube_path}/fixed_joint", curr_parent_path, tube_path, curr_pos, curr_quat)
+                    tube_mass = tube_target_masses[tube_idx]
+                    self._apply_mass_properties(
+                        tube_prim,
+                        mass=tube_mass,
+                        diagonal_inertia=self._cylinder_inertia(tube_mass, tube_radius, tube_length, axis="z"),
+                        center_of_mass=(0.0, 0.0, tube_length / 2.0),
+                    )
                     curr_parent_path = tube_path
                     curr_pos = Gf.Vec3f(0, 0, tube_length)
                     curr_quat = Gf.Quatf(1, 0, 0, 0)
@@ -344,10 +503,9 @@ class LynxUsdConstructor:
             sim_utils.create_prim(link_path, prim_type="Xform")
             link_prim = stage.GetPrimAtPath(link_path)
             UsdPhysics.RigidBodyAPI.Apply(link_prim)
-            # Add mass to the link to prevent it from being treated as massless
-            mass_api = UsdPhysics.MassAPI.Apply(link_prim)
-            mass_api.CreateMassAttr(0.1) # 100g per link as a placeholder
-            
+            # Apply rigid body properties if provided
+            if hasattr(self.cfg.spawn, "rigid_props") and self.cfg.spawn.rigid_props is not None:
+                sim_utils.define_rigid_body_properties(link_path, self.cfg.spawn.rigid_props)
             p = joint_params[i]
             j_type = joint_types[i]
             angle_rad = np.deg2rad(self.cfg.rotation_angles[i])
@@ -362,11 +520,12 @@ class LynxUsdConstructor:
                 cylinder2_pos = joint_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["r1"] + p["l2"] / 2))
                 cylinder2_add_pos = joint_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["r1"] / 2))
 
-                # Fixed part visual
+                # Fixed and moving geometry should each have a single visible collidable mesh.
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
                     f"{link_path}/fixed_visual",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r0"], height=p["l0"],
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3))
                     ),
                     translation=(0, 0, p["l0"] / 2)
@@ -383,12 +542,16 @@ class LynxUsdConstructor:
                 joint.CreateLocalRot0Attr().Set(curr_quat)
                 joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))
                 joint.CreateLocalRot1Attr().Set(Gf.Quatf(1, 0, 0, 0))
+                joint.CreateCollisionEnabledAttr(False)
+                self._set_joint_limits(joint, *joint_limits_deg[i])
+                sim_utils.safe_set_attribute_on_usd_prim(stage.GetPrimAtPath(joint_path), "physics:jointEnabled", True, camel_case=True)
                 
                 # Moving part visuals
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
                     f"{link_path}/moving_visual_main",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r1"], height=p["l1"],
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
                     ),
                     translation=tuple(joint_pos)
@@ -398,6 +561,7 @@ class LynxUsdConstructor:
                     f"{link_path}/moving_visual_attach_add",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r2"], height=p["r1"],
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
                     ),
                     translation=tuple(cylinder2_add_pos),
@@ -408,6 +572,7 @@ class LynxUsdConstructor:
                     f"{link_path}/moving_visual_attach",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r2"], height=p["l2"],
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
                     ),
                     translation=tuple(cylinder2_pos),
@@ -417,8 +582,30 @@ class LynxUsdConstructor:
                 # Update curr for next iteration
                 curr_parent_path = link_path
                 curr_pos = cylinder2_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["l2"] / 2))
-                # Fix: Use new_relative_quat * curr_quat to accumulate rotation correctly
+                # Propagate the child joint frame orientation to the next attachment.
                 curr_quat = new_relative_quat
+
+                component_masses = [0.25 * link_target_masses[i], 0.55 * link_target_masses[i], 0.20 * link_target_masses[i]]
+                link_mass, link_inertia, link_com = self._combine_bodies(
+                    [
+                        (
+                            component_masses[0],
+                            self._cylinder_inertia(component_masses[0], p["r0"], p["l0"], axis="z"),
+                            Gf.Vec3f(0.0, 0.0, p["l0"] / 2.0),
+                        ),
+                        (
+                            component_masses[1],
+                            self._cylinder_inertia(component_masses[1], p["r1"], p["l1"], axis="z"),
+                            joint_pos,
+                        ),
+                        (
+                            component_masses[2],
+                            self._cylinder_inertia(component_masses[2], p["r2"], p["l2"], axis="z"),
+                            cylinder2_pos,
+                        ),
+                    ]
+                )
+                self._apply_mass_properties(link_prim, link_mass, link_inertia, link_com)
 
             else:
                 # JointOrthogonal logic from joints.py
@@ -435,11 +622,11 @@ class LynxUsdConstructor:
                 joint_pos_rel = Gf.Vec3f(0, 0, l0_orig + r1)
                 cylinder2_pos_rel = joint_pos_rel + new_relative_quat.Transform(Gf.Vec3f(0, 0, l1 / 2 + l2_orig / 2))
 
-                # Fixed part visuals
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
                     f"{link_path}/fixed_visual_0",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r0_orig, height=l0_orig,
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
                     ),
                     translation=tuple(cylinder0_pos)
@@ -448,6 +635,7 @@ class LynxUsdConstructor:
                     f"{link_path}/fixed_visual_add",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r0_orig, height=r1,
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
                     ),
                     translation=tuple(cylinder0_add_pos)
@@ -458,6 +646,7 @@ class LynxUsdConstructor:
                     f"{link_path}/fixed_visual_shell",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r1, height=l1,
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
                     ),
                     translation=tuple(joint_pos_rel),
@@ -472,15 +661,19 @@ class LynxUsdConstructor:
                 joint.CreateBody1Rel().SetTargets([link_path])
                 
                 joint.CreateLocalPos0Attr().Set(curr_pos)
-                joint.CreateLocalRot0Attr().Set(curr_quat) 
+                joint.CreateLocalRot0Attr().Set(curr_quat)
                 joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))
                 joint.CreateLocalRot1Attr().Set(Gf.Quatf(1, 0, 0, 0))
+                joint.CreateCollisionEnabledAttr(False)
+                self._set_joint_limits(joint, *joint_limits_deg[i])
+                sim_utils.safe_set_attribute_on_usd_prim(stage.GetPrimAtPath(joint_path), "physics:jointEnabled", True, camel_case=True)
                 
                 # Moving part visual
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
                     f"{link_path}/moving_visual",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r2_orig, height=l2_orig,
+                        collision_props=sim_utils.CollisionPropertiesCfg(),
                         visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3))
                     ),
                     translation=tuple(cylinder2_pos_rel),
@@ -493,11 +686,35 @@ class LynxUsdConstructor:
                 # Fix: Use new_relative_quat * curr_quat to accumulate rotation correctly
                 curr_quat = new_relative_quat
 
-            # Apply Drive API
-            drive = UsdPhysics.DriveAPI.Apply(stage.GetPrimAtPath(f"{link_path}/{joint_name}"), "revolute")
-            drive.CreateTypeAttr("position")
-            drive.CreateStiffnessAttr(self.cfg.actuators["lynx_arm"].stiffness)
-            drive.CreateDampingAttr(self.cfg.actuators["lynx_arm"].damping)
+                component_masses = [0.25 * link_target_masses[i], 0.25 * link_target_masses[i], 0.30 * link_target_masses[i], 0.20 * link_target_masses[i]]
+                link_mass, link_inertia, link_com = self._combine_bodies(
+                    [
+                        (
+                            component_masses[0],
+                            self._cylinder_inertia(component_masses[0], r0_orig, l0_orig, axis="z"),
+                            cylinder0_pos,
+                        ),
+                        (
+                            component_masses[1],
+                            self._cylinder_inertia(component_masses[1], r0_orig, r1, axis="z"),
+                            cylinder0_add_pos,
+                        ),
+                        (
+                            component_masses[2],
+                            self._cylinder_inertia(component_masses[2], r1, l1, axis="x"),
+                            joint_pos_rel,
+                        ),
+                        (
+                            component_masses[3],
+                            self._cylinder_inertia(component_masses[3], r2_orig, l2_orig, axis="x"),
+                            cylinder2_pos_rel,
+                        ),
+                    ]
+                )
+                self._apply_mass_properties(link_prim, link_mass, link_inertia, link_com)
+
+            # Apply active/passive joint properties
+            self._set_joint_drive_and_damping(stage.GetPrimAtPath(f"{link_path}/{joint_name}"), i)
 
         # 3. End Effector
         ee_cyl_length = 0.07
@@ -506,12 +723,19 @@ class LynxUsdConstructor:
         sim_utils.create_prim(ee_cyl_path, prim_type="Xform")
         ee_cyl_prim = stage.GetPrimAtPath(ee_cyl_path)
         UsdPhysics.RigidBodyAPI.Apply(ee_cyl_prim)
-        UsdPhysics.MassAPI.Apply(ee_cyl_prim).CreateMassAttr(0.05)
-        
+        ee_cyl_mass = 0.35
+        self._apply_mass_properties(
+            ee_cyl_prim,
+            mass=ee_cyl_mass,
+            diagonal_inertia=self._cylinder_inertia(ee_cyl_mass, ee_cyl_radius, ee_cyl_length, axis="z"),
+            center_of_mass=(0.0, 0.0, ee_cyl_length / 2.0),
+        )
         sim_utils.spawners.meshes.spawn_mesh_cylinder(
             f"{ee_cyl_path}/visual",
             sim_utils.spawners.MeshCylinderCfg(
-                radius=ee_cyl_radius, height=ee_cyl_length,
+                radius=ee_cyl_radius,
+                height=ee_cyl_length,
+                collision_props=sim_utils.CollisionPropertiesCfg(),
                 visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.15, 0.15, 0.15))
             ),
             translation=(0, 0, ee_cyl_length / 2)
@@ -523,12 +747,18 @@ class LynxUsdConstructor:
         sim_utils.create_prim(ee_path, prim_type="Xform")
         ee_prim = stage.GetPrimAtPath(ee_path)
         UsdPhysics.RigidBodyAPI.Apply(ee_prim)
-        UsdPhysics.MassAPI.Apply(ee_prim).CreateMassAttr(0.05)
-        
+        ee_mass = 0.45
+        self._apply_mass_properties(
+            ee_prim,
+            mass=ee_mass,
+            diagonal_inertia=self._box_inertia(ee_mass, (0.05, 0.05, 0.05)),
+            center_of_mass=(0.0, 0.0, 0.0),
+        )
         sim_utils.spawners.meshes.spawn_mesh_cuboid(
             f"{ee_path}/visual",
             sim_utils.spawners.MeshCuboidCfg(
                 size=(0.05, 0.05, 0.05),
+                collision_props=sim_utils.CollisionPropertiesCfg(),
                 visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.2, 0.8, 0.2))
             )
         )
