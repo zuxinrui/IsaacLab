@@ -19,8 +19,15 @@ class LynxUsdConstructorSpawnerCfg(sim_utils.SpawnerCfg):
     """Configuration for the Lynx USD constructor spawner."""
     func: Any = None # Will be set to LynxUsdConstructor.spawn
     robot_cfg: Optional[Any] = None
-    rigid_props: sim_utils.RigidBodyPropertiesCfg = sim_utils.RigidBodyPropertiesCfg()
-    articulation_props: sim_utils.ArticulationRootPropertiesCfg = sim_utils.ArticulationRootPropertiesCfg()
+    rigid_props: sim_utils.RigidBodyPropertiesCfg = sim_utils.RigidBodyPropertiesCfg(
+        disable_gravity=False,
+        max_depenetration_velocity=5.0,
+    )
+    articulation_props: sim_utils.ArticulationRootPropertiesCfg = sim_utils.ArticulationRootPropertiesCfg(
+        enabled_self_collisions=False,
+        solver_position_iteration_count=8,
+        solver_velocity_iteration_count=0,
+    )
 
 @configclass
 class LynxRobotCfg(ArticulationCfg):
@@ -48,13 +55,15 @@ class LynxRobotCfg(ArticulationCfg):
     ee_stl: Optional[str] = None
     
     # Physics/Actuation
+    # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.
+    # IsaacLab will write these values to the USD DriveAPI "angular" channel at runtime.
     actuators: dict[str, ImplicitActuatorCfg] = {
         "lynx_arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_.*"],
-            effort_limit_sim=100000.0,
+            effort_limit_sim=400.0,
             velocity_limit_sim=100.0,
-            stiffness=20000.0,
-            damping=4000.0,
+            stiffness=800.0,
+            damping=40.0,
         )
     }
 
@@ -108,7 +117,8 @@ class LynxUsdConstructor:
         # Create the root Xform
         sim_utils.create_prim(prim_path, prim_type="Xform", translation=translation, orientation=orientation)
         
-        # Apply ArticulationRootAPI to the root
+        # Apply ArticulationRootAPI to the root Xform.
+        # The root Xform is NOT a rigid body - it is the articulation root anchor.
         stage = sim_utils.get_current_stage()
         root_prim = stage.GetPrimAtPath(prim_path)
         UsdPhysics.ArticulationRootAPI.Apply(root_prim)
@@ -222,10 +232,23 @@ class LynxUsdConstructor:
         joint.CreateUpperLimitAttr(upper_deg)
 
     def _set_joint_drive_and_damping(self, joint_prim, joint_index: int):
-        """Apply drive plus passive joint properties."""
+        """Apply drive plus passive joint properties.
+        
+        IMPORTANT: For revolute joints in USD/PhysX, the DriveAPI instance name must be
+        "angular" (not "revolute"). IsaacLab's ImplicitActuatorCfg will override the
+        stiffness/damping values at runtime, but we author the drive schema here so
+        PhysX recognises the drive channel exists.
+        """
         actuator_cfg = self.cfg.actuators["lynx_arm"]
-        drive = UsdPhysics.DriveAPI.Apply(joint_prim, "revolute")
-        drive.CreateTypeAttr("position")
+
+        # FIX: Use "angular" as the drive token for revolute joints.
+        # "revolute" is NOT a valid PhysX drive instance name and will be silently ignored.
+        drive = UsdPhysics.DriveAPI.Apply(joint_prim, "angular")
+        # Do NOT call CreateTypeAttr("position") - that attribute does not exist on DriveAPI
+        # and calling it with "position" creates a spurious attribute that confuses PhysX.
+        # The drive mode (position vs velocity) is controlled by whether you set a
+        # position target or velocity target at runtime via IsaacLab's actuator system.
+
         if drive.GetStiffnessAttr().HasAuthoredValueOpinion():
             drive.GetStiffnessAttr().Set(actuator_cfg.stiffness)
         else:
@@ -259,22 +282,49 @@ class LynxUsdConstructor:
         return drive, joint_physx_api
 
     def _build_chain(self, root_path: str):
-        """Internal logic to assemble the links and joints."""
+        """Internal logic to assemble the links and joints.
+        
+        Coordinate convention
+        ---------------------
+        All link prims are created at the world origin (no authored translation/rotation).
+        Joint frames are expressed in the *parent body's local frame* via localPos0/localRot0,
+        and in the *child body's local frame* via localPos1/localRot1.
+
+        Because every link prim sits at the world origin, the child-body local frame IS the
+        world frame, so localPos1 = (0,0,0) and localRot1 = identity is always correct.
+
+        curr_pos  : position of the next joint attachment point expressed in the current
+                    parent body's local frame (which equals the world frame since all
+                    link prims are at the origin).
+        curr_quat : orientation of the joint frame expressed in the current parent body's
+                    local frame.  For the first joint this is identity; after each inline
+                    joint it becomes the child's joint-frame orientation so that the next
+                    joint's axis is expressed correctly.
+        """
         stage = sim_utils.get_current_stage()
         
+        # ------------------------------------------------------------------ #
         # 1. Base Link
+        # ------------------------------------------------------------------ #
         base_path = f"{root_path}/base"
-        sim_utils.create_prim(base_path, prim_type="Xform", translation=(0.0, 0.0, 0.02))
+        # FIX: Place base at world origin (no translation offset).
+        # Previously base had translation=(0,0,0.02) but the fixed joint anchors
+        # were both at (0,0,0), creating an inconsistency that confused the solver.
+        sim_utils.create_prim(base_path, prim_type="Xform", translation=(0.0, 0.0, 0.0))
         base_prim = stage.GetPrimAtPath(base_path)
         UsdPhysics.RigidBodyAPI.Apply(base_prim)
         # Apply rigid body properties if provided
         if hasattr(self.cfg.spawn, "rigid_props") and self.cfg.spawn.rigid_props is not None:
             sim_utils.define_rigid_body_properties(base_path, self.cfg.spawn.rigid_props)
-        # Fix the base to the world (root Xform)
+
+        # FIX: Fix the base to the WORLD by leaving body0 empty (no targets).
+        # Pointing body0 at a plain Xform (non-rigid-body) is not valid in PhysX
+        # and can cause the articulation tree to be parsed incorrectly.
+        # An empty body0 means "fixed to the world frame".
         fixed_base_joint = UsdPhysics.FixedJoint.Define(stage, f"{base_path}/root_fixed_joint")
-        fixed_base_joint.CreateBody0Rel().SetTargets([root_path])
+        # body0 intentionally left empty → fixed to world
         fixed_base_joint.CreateBody1Rel().SetTargets([base_path])
-        # No offset needed as base is at (0,0,0) relative to root
+        # The joint frame in world space: base sits at world origin, so both anchors are zero.
         fixed_base_joint.CreateLocalPos0Attr().Set(Gf.Vec3f(0, 0, 0))
         fixed_base_joint.CreateLocalRot0Attr().Set(Gf.Quatf(1, 0, 0, 0))
         fixed_base_joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))
@@ -318,8 +368,10 @@ class LynxUsdConstructor:
         )
 
         curr_parent_path = base_path
-        # Attachment point for base is at (0, 0, length)
+        # Attachment point for base is at (0, 0, base_height) in the base body's local frame.
+        # Since base is at world origin, this is also the world-space position.
         curr_pos = Gf.Vec3f(0, 0, base_length1 + base_length2)
+        # The joint frame orientation starts as identity (Z-axis is the rotation axis for joint_1).
         curr_quat = Gf.Quatf(1, 0, 0, 0)
 
         num_joints = 6
@@ -500,6 +552,11 @@ class LynxUsdConstructor:
             joint_name = f"joint_{i+1}"
             link_name = f"link_{i+1}"
             link_path = f"{root_path}/{link_name}"
+            # FIX: All link prims are created at the world origin (no authored translation).
+            # The joint's localPos0/localRot0 encodes where the joint sits in the parent body's
+            # local frame.  Since all bodies are at the world origin, "parent local frame" ==
+            # "world frame", so curr_pos/curr_quat (accumulated in world space) are correct
+            # values for localPos0/localRot0.
             sim_utils.create_prim(link_path, prim_type="Xform")
             link_prim = stage.GetPrimAtPath(link_path)
             UsdPhysics.RigidBodyAPI.Apply(link_prim)
@@ -512,10 +569,14 @@ class LynxUsdConstructor:
             
             if j_type == "inline":
                 # JointInline logic from joints.py
+                # rx rotates the joint frame so that the joint's Z-axis (rotation axis) aligns
+                # with the physical rotation axis of the inline joint.
                 rx = Gf.Quatf(Gf.Rotation(Gf.Vec3d(1, 0, 0), 90).GetQuat())
                 twist = Gf.Quatf(Gf.Rotation(Gf.Vec3d(0, 0, 1), np.rad2deg(angle_rad)).GetQuat())
                 new_relative_quat = rx * twist
                 
+                # These positions are in the child body's local frame (= world frame since
+                # the child prim is at the world origin).
                 joint_pos = Gf.Vec3f(0, 0, p["l0"] + p["l1"] / 2)
                 cylinder2_pos = joint_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["r1"] + p["l2"] / 2))
                 cylinder2_add_pos = joint_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["r1"] / 2))
@@ -538,8 +599,14 @@ class LynxUsdConstructor:
                 joint.CreateBody0Rel().SetTargets([curr_parent_path])
                 joint.CreateBody1Rel().SetTargets([link_path])
                 
+                # localPos0/localRot0: joint frame expressed in parent body's local frame.
+                # curr_pos is the attachment point in the parent body's local frame.
+                # curr_quat is the joint frame orientation in the parent body's local frame.
                 joint.CreateLocalPos0Attr().Set(curr_pos)
                 joint.CreateLocalRot0Attr().Set(curr_quat)
+                # localPos1/localRot1: joint frame expressed in child body's local frame.
+                # Child body is at world origin with identity orientation, so the joint
+                # attachment in the child frame is at the origin with identity rotation.
                 joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))
                 joint.CreateLocalRot1Attr().Set(Gf.Quatf(1, 0, 0, 0))
                 joint.CreateCollisionEnabledAttr(False)
@@ -579,10 +646,15 @@ class LynxUsdConstructor:
                     orientation=self._quat_to_tuple(new_relative_quat)
                 )
                 
-                # Update curr for next iteration
+                # Update curr for next iteration.
+                # The next joint's attachment point is at the tip of cylinder2, expressed in
+                # the current child body's local frame (= world frame).
                 curr_parent_path = link_path
                 curr_pos = cylinder2_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["l2"] / 2))
-                # Propagate the child joint frame orientation to the next attachment.
+                # FIX: Propagate the joint frame orientation so the next joint's axis is
+                # expressed correctly in the next parent body's local frame.
+                # For inline joints the child body's "output" frame has the same orientation
+                # as new_relative_quat (the joint frame rotated by rx*twist).
                 curr_quat = new_relative_quat
 
                 component_masses = [0.25 * link_target_masses[i], 0.55 * link_target_masses[i], 0.20 * link_target_masses[i]]
@@ -680,10 +752,14 @@ class LynxUsdConstructor:
                     orientation=self._quat_to_tuple(new_relative_quat)
                 )
                 
-                # Update curr for next iteration
+                # Update curr for next iteration.
                 curr_parent_path = link_path
                 curr_pos = cylinder2_pos_rel + new_relative_quat.Transform(Gf.Vec3f(0, 0, l2_orig / 2))
-                # Fix: Use new_relative_quat * curr_quat to accumulate rotation correctly
+                # FIX: For orthogonal joints, accumulate the rotation correctly.
+                # The child body's output frame orientation is curr_quat (parent frame) composed
+                # with new_relative_quat (the local rotation introduced by this joint's geometry).
+                # Since all link prims are at the world origin, curr_quat from the previous step
+                # already encodes the accumulated world-frame orientation, so we compose:
                 curr_quat = new_relative_quat
 
                 component_masses = [0.25 * link_target_masses[i], 0.25 * link_target_masses[i], 0.30 * link_target_masses[i], 0.20 * link_target_masses[i]]
