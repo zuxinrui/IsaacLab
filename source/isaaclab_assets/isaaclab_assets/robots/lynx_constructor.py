@@ -34,22 +34,37 @@ class LynxRobotCfg(ArticulationCfg):
     """Configuration for the procedurally generated Lynx robot."""
     
     # Genotypes
+    num_joints: int = 6
     genotype_tube: List[int] = [0, 1, 0, 1, 0]
     genotype_joints: int = 1 # 0: all orthogonal, 1: all inline, 2: mixed (from spec)
     rotation_angles: List[float] = [180.0, 0.0, 0.0, -180.0, 0.0, 0.0]
     
-    # B-Spline Tube Parameters
-    use_bspline: bool = True
-    bspline_num_segments: int = 100
-    bspline_end_point_pos: tuple = (0.0, 0.1, 0.3)
-    bspline_end_point_theta: float = 90.0
+    # Tube 1:
+    l1_end_point_pos: tuple = (0.0, 0.0, 0.36)
+    l1_end_point_theta: float = 0.0
+    # Tube 2:
+    l2_end_point_pos: tuple = (0.0, 0.1, 0.2805)
+    l2_end_point_theta: float = 0.0
+    # Tube 3:
+    l3_end_point_pos: tuple = (0.0, 0.0, 0.36)
+    l3_end_point_theta: float = 0.0
+    # Tube 4:
+    l4_end_point_pos: tuple = (0.0, 0.1, 0.2805)
+    l4_end_point_theta: float = 0.0
+    # Tube 5:
+    l5_end_point_pos: tuple = (0.0, 0.0, 0.36)
+    l5_end_point_theta: float = 0.0
+
+    # Other tube parameters:
     bspline_dual_point_distance: float = 0.07
-    mounting_length_start: float = 0.04
-    mounting_length_end: float = 0.04
+    mounting_length_start: float = 0.045
+    mounting_length_end: float = 0.045
     
     # Geometric Parameters
-    tube_radiuses: List[float] = [0.035] * 5  # [0.0396] * 5
-    clamp_length: float = 0.051
+    tube_radiuses: List[float] = [0.0396] * 5
+    # clamp_length: float = 0.051
+    # B-Spline Tube Parameters
+    bspline_num_segments: int = 50
     # Paths to STLs (assuming they will be provided or are in a known location)
     clamp_stl: str = "source/isaaclab_assets/data/Robots/Lynx/models/clamp_0226.stl"
     ee_stl: Optional[str] = None
@@ -58,13 +73,27 @@ class LynxRobotCfg(ArticulationCfg):
     # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.
     # IsaacLab will write these values to the USD DriveAPI "angular" channel at runtime.
     actuators: dict[str, ImplicitActuatorCfg] = {
-        "lynx_arm": ImplicitActuatorCfg(
-            joint_names_expr=["joint_.*"],
-            effort_limit_sim=400.0,
-            velocity_limit_sim=100.0,
+        "lynx_arm_mega": ImplicitActuatorCfg(
+            joint_names_expr=["joint_[1-2]"],
+            effort_limit_sim=130.0,
+            velocity_limit_sim=np.radians(20.0),
             stiffness=800.0,
             damping=40.0,
-        )
+        ),
+        "lynx_arm_standard": ImplicitActuatorCfg(
+            joint_names_expr=["joint_[3-4]"],
+            effort_limit_sim=54.0,
+            velocity_limit_sim=np.radians(90.0),
+            stiffness=800.0,
+            damping=40.0,
+        ),
+        "lynx_arm_lite": ImplicitActuatorCfg(
+            joint_names_expr=["joint_[5-6]"],
+            effort_limit_sim=19.0,
+            velocity_limit_sim=np.radians(150.0),
+            stiffness=800.0,
+            damping=40.0,
+        ),
     }
 
     init_state: ArticulationCfg.InitialStateCfg = ArticulationCfg.InitialStateCfg(
@@ -77,6 +106,49 @@ class LynxRobotCfg(ArticulationCfg):
             "joint_6": 0.0,
         },
     )
+
+    def __post_init__(self):
+        """Post-initialization to filter actuators and init_state based on num_joints."""
+        # Filter actuators
+        new_actuators = {}
+        for name, actuator in self.actuators.items():
+            # Filter joint_names_expr to only include joints that exist
+            filtered_expr = []
+            for expr in actuator.joint_names_expr:
+                # This is a simple heuristic: if it's a range like joint_[1-2], 
+                # we check if any joint in that range exists.
+                # For simplicity, we just check if the joint names match the current num_joints.
+                if "joint_" in expr:
+                    import re
+                    match = re.search(r"\[(\d+)-(\d+)\]", expr)
+                    if match:
+                        start, end = int(match.group(1)), int(match.group(2))
+                        if start <= self.num_joints:
+                            actual_end = min(end, self.num_joints)
+                            if start == actual_end:
+                                filtered_expr.append(f"joint_{start}")
+                            else:
+                                filtered_expr.append(f"joint_[{start}-{actual_end}]")
+                    else:
+                        # Single joint name or other expression
+                        match_single = re.search(r"joint_(\d+)", expr)
+                        if match_single:
+                            if int(match_single.group(1)) <= self.num_joints:
+                                filtered_expr.append(expr)
+                        else:
+                            filtered_expr.append(expr)
+            
+            if filtered_expr:
+                actuator.joint_names_expr = filtered_expr
+                new_actuators[name] = actuator
+        self.actuators = new_actuators
+
+        # Filter init_state
+        if self.init_state.joint_pos:
+            self.init_state.joint_pos = {
+                k: v for k, v in self.init_state.joint_pos.items() 
+                if "joint_" in k and int(k.split("_")[1]) <= self.num_joints
+            }
     
     # Spawning logic
     spawn: LynxUsdConstructorSpawnerCfg = LynxUsdConstructorSpawnerCfg()
@@ -239,7 +311,13 @@ class LynxUsdConstructor:
         stiffness/damping values at runtime, but we author the drive schema here so
         PhysX recognises the drive channel exists.
         """
-        actuator_cfg = self.cfg.actuators["lynx_arm"]
+        # Select actuator config based on joint index
+        if joint_index < 2:
+            actuator_cfg = self.cfg.actuators["lynx_arm_mega"]
+        elif joint_index < 4:
+            actuator_cfg = self.cfg.actuators["lynx_arm_standard"]
+        else:
+            actuator_cfg = self.cfg.actuators["lynx_arm_lite"]
 
         # FIX: Use "angular" as the drive token for revolute joints.
         # "revolute" is NOT a valid PhysX drive instance name and will be silently ignored.
@@ -302,6 +380,47 @@ class LynxUsdConstructor:
                     joint's axis is expressed correctly.
         """
         stage = sim_utils.get_current_stage()
+
+        # Pro Arm 900 Physical Parameters
+        pro_arm_900_params = {
+            "base": {
+                "mass": 0.1,
+                "com": (0, 0, 0.012005),
+                "inertia": (3.009792e-04, 3.0097905e-04, 0.522597e-03)
+            },
+            "links": [
+                {
+                    "mass": 4.5,
+                    "com": (0.007687, 0.104424, 0),
+                    "inertia": (2.053456e-03, 3.997604e-04, 2.077309e-03)
+                },
+                {
+                    "mass": 6.0,
+                    "com": (0.092725, 0.145334, 0.000038),
+                    "inertia": (5.3897178e-03, 1.3406068e-03, 5.9820744e-03)
+                },
+                {
+                    "mass": 1.52,
+                    "com": (-0.021209, -0.000108, 0.009662),
+                    "inertia": (1.032334e-03, 6.154116e-04, 1.076372e-03)
+                },
+                {
+                    "mass": 1.52,
+                    "com": (0.003206, 0.206689, 0.000108),
+                    "inertia": (2.5807422e-03, 1.0628242e-03, 2.9577733e-03)
+                },
+                {
+                    "mass": 1.1,
+                    "com": (0.045224, -0.003419, 0.000110),
+                    "inertia": (9.4404410e-04, 5.9232063e-04, 9.9105550e-04)
+                },
+                {
+                    "mass": 1.1, # Assuming link 6 matches link 5 as per previous pattern
+                    "com": (0.045224, -0.003419, 0.000110),
+                    "inertia": (9.4404410e-04, 5.9232063e-04, 9.9105550e-04)
+                }
+            ]
+        }
         
         # ------------------------------------------------------------------ #
         # 1. Base Link
@@ -335,14 +454,14 @@ class LynxUsdConstructor:
         base_radius1 = 0.08
         base_length2 = 0.017 + 0.001
         base_radius2 = 0.08
-        base_mass = 6.0
         base_height = base_length1 + base_length2
         base_radius = max(base_radius1, base_radius2)
+        
         self._apply_mass_properties(
             base_prim,
-            mass=base_mass,
-            diagonal_inertia=self._cylinder_inertia(base_mass, base_radius, base_height, axis="z"),
-            center_of_mass=(0.0, 0.0, base_height / 2.0),
+            mass=pro_arm_900_params["base"]["mass"],
+            diagonal_inertia=pro_arm_900_params["base"]["inertia"],
+            center_of_mass=pro_arm_900_params["base"]["com"],
         )
         
         # Use collision-only geometry on the same prim names as visuals to avoid duplicate flashing meshes.
@@ -374,7 +493,7 @@ class LynxUsdConstructor:
         # The joint frame orientation starts as identity (Z-axis is the rotation axis for joint_1).
         curr_quat = Gf.Quatf(1, 0, 0, 0)
 
-        num_joints = 6
+        num_joints = self.cfg.num_joints
         
         # Determine joint types
         joints_inline = [True, True, True, True, True]
@@ -398,14 +517,17 @@ class LynxUsdConstructor:
             {"l0": 0.029, "r0": 0.04, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
         ]
 
-        joint_limits_deg = [(-170.0, 170.0), (-120.0, 120.0), (-120.0, 120.0), (-180.0, 180.0), (-120.0, 120.0), (-180.0, 180.0)]
-        link_target_masses = [2.8, 2.6, 1.9, 1.2, 0.9, 0.6]
-        tube_target_masses = [0.0, 0.35, 0.0, 0.22, 0.0]
+        joint_limits_deg = [(-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0)]
+        
+        # Legacy target masses for procedural approximations (tubes)
+        link_target_masses = [4.5, 4.5, 1.52, 1.52, 1.1, 1.1]
+        tube_target_masses = [0.0, 0.35, 0.0, 0.35, 0.0]
 
+        genotype_tube = self.cfg.genotype_tube[:num_joints-1]
         tube_idx = 0
         for i in range(num_joints):
             # 1. Check if we need to insert a tube BEFORE this joint (except joint 1)
-            if i > 0 and tube_idx < len(self.cfg.genotype_tube) and self.cfg.genotype_tube[tube_idx] == 1:
+            if i > 0 and tube_idx < len(genotype_tube) and genotype_tube[tube_idx] == 1:
                 tube_name = f"tube_{tube_idx+1}"
                 tube_path = f"{root_path}/{tube_name}"
                 sim_utils.create_prim(tube_path, prim_type="Xform")
@@ -415,134 +537,121 @@ class LynxUsdConstructor:
                 
                 tube_radius = self.cfg.tube_radiuses[tube_idx]
                 
-                if self.cfg.use_bspline:
-                    # B-Spline Tube Logic
-                    num_segs = self.cfg.bspline_num_segments
-                    end_pos = Gf.Vec3f(*self.cfg.bspline_end_point_pos)
-                    theta = np.radians(self.cfg.bspline_end_point_theta)
-                    d = self.cfg.bspline_dual_point_distance
-                    mounting_l_start = self.cfg.mounting_length_start
-                    mounting_l_end = self.cfg.mounting_length_end
-                    
-                    # Offsets for joint volumes
-                    pre_joint_r = joint_params[i-1]["r2"] if i > 0 else 0.08
-                    next_joint_r = joint_params[i]["r0"]
-                    
-                    # Calculate control points (clamped cubic)
-                    p0 = Gf.Vec3f(0, 0, 0)
-                    p1 = p0 + Gf.Vec3f(0, 0, d)
-                    
-                    # End direction from theta (rotate +Z toward +Y in YZ plane)
-                    s, c = np.sin(theta), np.cos(theta)
-                    t_dir = Gf.Vec3f(0, s, c).GetNormalized()
-                    
-                    # Offset end point by joint volumes and mounting lengths
-                    start_offset = pre_joint_r + mounting_l_start
-                    end_offset = next_joint_r + mounting_l_end
-                    p3 = end_pos - Gf.Vec3f(0, 0, start_offset) - t_dir * end_offset
-                    p2 = p3 - t_dir * d
-                    
-                    # Sample points along the curve (Cubic Bezier)
-                    curve_points = []
-                    for j in range(num_segs + 1):
-                        t = j / num_segs
-                        pt = (1-t)**3 * p0 + 3*(1-t)**2*t * p1 + 3*(1-t)*t**2 * p2 + t**3 * p3
-                        curve_points.append(pt)
-                    
-                    # Calculate start direction for mounting offset
-                    start_direction = (curve_points[1] - curve_points[0]).GetNormalized()
-                    # first segment will be extended backwards along the curve's initial tangent
-                    start_offset_vec = start_direction * (mounting_l_start - (curve_points[1] - curve_points[0]).GetLength())
-
-                    # Create segments
-                    last_seg_quat = Gf.Quatf(1, 0, 0, 0)
-                    actual_end_pos = p3
-                    for j in range(num_segs):
-                        p_start = curve_points[j]
-                        p_end = curve_points[j+1]
-                        direction = (p_end - p_start).GetNormalized()
-                        auto_length = (p_end - p_start).GetLength()
-                        
-                        is_first = (j == 0)
-                        is_last = (j == num_segs - 1)
-                        
-                        if is_first:
-                            seg_len = mounting_l_start
-                            seg_center = p_start + direction * (seg_len / 2)
-                        elif is_last:
-                            seg_len = mounting_l_end
-                            shifted_start = p_start + start_offset_vec
-                            seg_center = shifted_start + direction * (seg_len / 2)
-                        else:
-                            seg_len = auto_length
-                            shifted_start = p_start + start_offset_vec
-                            shifted_end = p_end + start_offset_vec
-                            seg_center = (shifted_start + shifted_end) * 0.5
-                        
-                        # Rotation from Z to direction
-                        z_axis = Gf.Vec3f(0, 0, 1)
-                        dot = z_axis * direction
-                        if abs(dot) > 0.9999:
-                            seg_quat = Gf.Quatf(1, 0, 0, 0) if dot > 0 else Gf.Quatf(0, 1, 0, 0)
-                        else:
-                            axis = (z_axis ^ direction).GetNormalized()
-                            angle = np.rad2deg(np.arccos(np.clip(dot, -1.0, 1.0)))
-                            seg_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(axis), angle).GetQuat())
-                        
-                        last_seg_quat = seg_quat
-                        if is_last:
-                            shifted_start = p_start + start_offset_vec
-                            actual_end_pos = shifted_start + direction * seg_len
-
-                        sim_utils.spawners.meshes.spawn_mesh_cylinder(
-                            f"{tube_path}/visual_{j}",
-                            sim_utils.spawners.MeshCylinderCfg(
-                                radius=tube_radius,
-                                height=seg_len,
-                                collision_props=sim_utils.CollisionPropertiesCfg(),
-                                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1)),
-                            ),
-                            translation=tuple(seg_center),
-                            orientation=self._quat_to_tuple(seg_quat)
-                        )
-                    
-                    self._create_fixed_joint(f"{tube_path}/fixed_joint", curr_parent_path, tube_path, curr_pos, curr_quat)
-                    approx_length = max((actual_end_pos - Gf.Vec3f(0.0, 0.0, 0.0)).GetLength(), 0.08)
-                    tube_mass = tube_target_masses[tube_idx]
-                    self._apply_mass_properties(
-                        tube_prim,
-                        mass=tube_mass,
-                        diagonal_inertia=self._cylinder_inertia(tube_mass, tube_radius, approx_length, axis="z"),
-                        center_of_mass=(0.0, 0.0, approx_length / 2.0),
-                    )
-                    curr_parent_path = tube_path
-                    curr_pos = actual_end_pos
-                    curr_quat = last_seg_quat
-                    
+                # B-Spline Tube Logic
+                num_segs = self.cfg.bspline_num_segments
+                
+                # Get tube-specific parameters
+                if tube_idx == 0:
+                    end_pos = Gf.Vec3f(*self.cfg.l1_end_point_pos)
+                    theta = np.radians(self.cfg.l1_end_point_theta)
+                elif tube_idx == 1:
+                    end_pos = Gf.Vec3f(*self.cfg.l2_end_point_pos)
+                    theta = np.radians(self.cfg.l2_end_point_theta)
+                elif tube_idx == 2:
+                    end_pos = Gf.Vec3f(*self.cfg.l3_end_point_pos)
+                    theta = np.radians(self.cfg.l3_end_point_theta)
+                elif tube_idx == 3:
+                    end_pos = Gf.Vec3f(*self.cfg.l4_end_point_pos)
+                    theta = np.radians(self.cfg.l4_end_point_theta)
                 else:
-                    # Straight Tube Logic
-                    tube_length = 0.2805 # Default
+                    end_pos = Gf.Vec3f(*self.cfg.l5_end_point_pos)
+                    theta = np.radians(self.cfg.l5_end_point_theta)
+
+                d = self.cfg.bspline_dual_point_distance
+                mounting_l_start = self.cfg.mounting_length_start
+                mounting_l_end = self.cfg.mounting_length_end
+                
+                # Calculate control points (clamped cubic)
+                p0 = Gf.Vec3f(0, 0, 0)
+                p1 = p0 + Gf.Vec3f(0, 0, d)
+                
+                # End direction from theta (rotate +Z toward +Y in YZ plane)
+                s, c = np.sin(theta), np.cos(theta)
+                t_dir = Gf.Vec3f(0, s, c).GetNormalized()
+                
+                # Offset end point by mounting lengths only (no joint radius offset)
+                # p3 should also canlculate the start:
+                z_hat = Gf.Vec3f(0, 0, 1)
+                
+                p3 = end_pos - z_hat * mounting_l_start - t_dir * mounting_l_end
+                p2 = p3 - t_dir * d
+                
+                # Sample points along the curve (Cubic Bezier)
+                curve_points = []
+                for j in range(num_segs + 1):
+                    t = j / num_segs
+                    pt = (1-t)**3 * p0 + 3*(1-t)**2*t * p1 + 3*(1-t)*t**2 * p2 + t**3 * p3
+                    curve_points.append(pt)
+                
+                # Calculate start direction for mounting offset
+                start_direction = (curve_points[1] - curve_points[0]).GetNormalized()
+                # first segment will be extended backwards along the curve's initial tangent
+                start_offset_vec = start_direction * (mounting_l_start - (curve_points[1] - curve_points[0]).GetLength())
+
+                # Create segments
+                last_seg_quat = Gf.Quatf(1, 0, 0, 0)
+                actual_end_pos = p3
+                for j in range(num_segs):
+                    p_start = curve_points[j]
+                    p_end = curve_points[j+1]
+                    direction = (p_end - p_start).GetNormalized()
+                    auto_length = (p_end - p_start).GetLength()
+                    
+                    is_first = (j == 0)
+                    is_last = (j == num_segs - 1)
+                    
+                    if is_first:
+                        seg_len = mounting_l_start
+                        seg_center = p_start + direction * (seg_len / 2)
+                    elif is_last:
+                        seg_len = mounting_l_end
+                        shifted_start = p_start + start_offset_vec
+                        seg_center = shifted_start + direction * (seg_len / 2)
+                    else:
+                        seg_len = auto_length
+                        shifted_start = p_start + start_offset_vec
+                        shifted_end = p_end + start_offset_vec
+                        seg_center = (shifted_start + shifted_end) * 0.5
+                    
+                    # Rotation from Z to direction
+                    z_axis = Gf.Vec3f(0, 0, 1)
+                    dot = z_axis * direction
+                    if abs(dot) > 0.9999:
+                        seg_quat = Gf.Quatf(1, 0, 0, 0) if dot > 0 else Gf.Quatf(0, 1, 0, 0)
+                    else:
+                        axis = (z_axis ^ direction).GetNormalized()
+                        angle = np.rad2deg(np.arccos(np.clip(dot, -1.0, 1.0)))
+                        seg_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(axis), angle).GetQuat())
+                    
+                    last_seg_quat = seg_quat
+                    if is_last:
+                        shifted_start = p_start + start_offset_vec
+                        actual_end_pos = shifted_start + direction * seg_len
+
                     sim_utils.spawners.meshes.spawn_mesh_cylinder(
-                        f"{tube_path}/visual",
+                        f"{tube_path}/visual_{j}",
                         sim_utils.spawners.MeshCylinderCfg(
                             radius=tube_radius,
-                            height=tube_length,
+                            height=seg_len,
                             collision_props=sim_utils.CollisionPropertiesCfg(),
-                            visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
+                            visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1)),
                         ),
-                        translation=(0, 0, tube_length / 2)
+                        translation=tuple(seg_center),
+                        orientation=self._quat_to_tuple(seg_quat)
                     )
-                    self._create_fixed_joint(f"{tube_path}/fixed_joint", curr_parent_path, tube_path, curr_pos, curr_quat)
-                    tube_mass = tube_target_masses[tube_idx]
-                    self._apply_mass_properties(
-                        tube_prim,
-                        mass=tube_mass,
-                        diagonal_inertia=self._cylinder_inertia(tube_mass, tube_radius, tube_length, axis="z"),
-                        center_of_mass=(0.0, 0.0, tube_length / 2.0),
-                    )
-                    curr_parent_path = tube_path
-                    curr_pos = Gf.Vec3f(0, 0, tube_length)
-                    curr_quat = Gf.Quatf(1, 0, 0, 0)
+                
+                self._create_fixed_joint(f"{tube_path}/fixed_joint", curr_parent_path, tube_path, curr_pos, curr_quat)
+                approx_length = max((actual_end_pos - Gf.Vec3f(0.0, 0.0, 0.0)).GetLength(), 0.08)
+                tube_mass = tube_target_masses[tube_idx]
+                self._apply_mass_properties(
+                    tube_prim,
+                    mass=tube_mass,
+                    diagonal_inertia=self._cylinder_inertia(tube_mass, tube_radius, approx_length, axis="z"),
+                    center_of_mass=(0.0, 0.0, approx_length / 2.0),
+                )
+                curr_parent_path = tube_path
+                curr_pos = actual_end_pos
+                curr_quat = last_seg_quat
                 
                 tube_idx += 1
             elif i > 0:
@@ -657,26 +766,11 @@ class LynxUsdConstructor:
                 # as new_relative_quat (the joint frame rotated by rx*twist).
                 curr_quat = new_relative_quat
 
-                component_masses = [0.25 * link_target_masses[i], 0.55 * link_target_masses[i], 0.20 * link_target_masses[i]]
-                link_mass, link_inertia, link_com = self._combine_bodies(
-                    [
-                        (
-                            component_masses[0],
-                            self._cylinder_inertia(component_masses[0], p["r0"], p["l0"], axis="z"),
-                            Gf.Vec3f(0.0, 0.0, p["l0"] / 2.0),
-                        ),
-                        (
-                            component_masses[1],
-                            self._cylinder_inertia(component_masses[1], p["r1"], p["l1"], axis="z"),
-                            joint_pos,
-                        ),
-                        (
-                            component_masses[2],
-                            self._cylinder_inertia(component_masses[2], p["r2"], p["l2"], axis="z"),
-                            cylinder2_pos,
-                        ),
-                    ]
-                )
+                # Apply Pro Arm 900 physical parameters
+                link_mass = pro_arm_900_params["links"][i]["mass"]
+                link_inertia = pro_arm_900_params["links"][i]["inertia"]
+                link_com = pro_arm_900_params["links"][i]["com"]
+                
                 self._apply_mass_properties(link_prim, link_mass, link_inertia, link_com)
 
             else:
@@ -762,31 +856,11 @@ class LynxUsdConstructor:
                 # already encodes the accumulated world-frame orientation, so we compose:
                 curr_quat = new_relative_quat
 
-                component_masses = [0.25 * link_target_masses[i], 0.25 * link_target_masses[i], 0.30 * link_target_masses[i], 0.20 * link_target_masses[i]]
-                link_mass, link_inertia, link_com = self._combine_bodies(
-                    [
-                        (
-                            component_masses[0],
-                            self._cylinder_inertia(component_masses[0], r0_orig, l0_orig, axis="z"),
-                            cylinder0_pos,
-                        ),
-                        (
-                            component_masses[1],
-                            self._cylinder_inertia(component_masses[1], r0_orig, r1, axis="z"),
-                            cylinder0_add_pos,
-                        ),
-                        (
-                            component_masses[2],
-                            self._cylinder_inertia(component_masses[2], r1, l1, axis="x"),
-                            joint_pos_rel,
-                        ),
-                        (
-                            component_masses[3],
-                            self._cylinder_inertia(component_masses[3], r2_orig, l2_orig, axis="x"),
-                            cylinder2_pos_rel,
-                        ),
-                    ]
-                )
+                # Apply Pro Arm 900 physical parameters
+                link_mass = pro_arm_900_params["links"][i]["mass"]
+                link_inertia = pro_arm_900_params["links"][i]["inertia"]
+                link_com = pro_arm_900_params["links"][i]["com"]
+                
                 self._apply_mass_properties(link_prim, link_mass, link_inertia, link_com)
 
             # Apply active/passive joint properties

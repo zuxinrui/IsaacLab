@@ -3,16 +3,16 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This script demonstrates how to use the JointPositionAction with the modular Lynx robot."""
+"""This script implements a 5Hz motor control for the Lynx robot with velocity clipping."""
 
 import argparse
-import math
 import torch
+import numpy as np
 
 from isaaclab.app import AppLauncher
 
 # add argparser
-parser = argparse.ArgumentParser(description="Test script for Lynx Simple Position Control.")
+parser = argparse.ArgumentParser(description="5Hz Motor Control for Lynx with Velocity Clipping.")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -52,34 +52,16 @@ class LynxSceneCfg(InteractiveSceneCfg):
     # Robot configuration
     robot: LynxRobotCfg = LynxRobotCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
-        genotype_tube=[0, 1, 0, 1, 0],
-        genotype_joints=1,
     )
-    # Set stiffness and damping for the joints
-    # These are the Kp and Kd values for the joint position control
-    # robot.actuators["lynx_arm"].stiffness = 80.0
-    # robot.actuators["lynx_arm"].damping = 4.0
-    # robot.actuators["lynx_arm"].effort_limit = 87.0
-    # robot.actuators["lynx_arm"].friction = 0.0
     
-    # Strictly match Franka's articulation properties
     robot.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(
         enabled_self_collisions=True, 
         solver_position_iteration_count=32, 
         solver_velocity_iteration_count=4
     )
-    robot.spawn.rigid_props = sim_utils.RigidBodyPropertiesCfg(
-        disable_gravity=False,
-        max_depenetration_velocity=5.0,
-        linear_damping=0.5,
-        angular_damping=0.5,
-        max_linear_velocity=1000.0,
-        max_angular_velocity=1000.0,
-    )
     
     # Ensure the spawn function is set and has the robot_cfg
     robot.spawn.func = LynxUsdConstructor.spawn
-    # Use a dictionary to avoid recursion in configclass validation
     robot.spawn.robot_cfg = {
         "genotype_tube": robot.genotype_tube,
         "genotype_joints": robot.genotype_joints,
@@ -113,21 +95,20 @@ class LynxObservationsCfg:
     policy: PolicyCfg = PolicyCfg()
 
 @configclass
-class LynxPosControlTestEnvCfg(ManagerBasedEnvCfg):
+class Lynx5HzControlEnvCfg(ManagerBasedEnvCfg):
     def __post_init__(self):
         # Scene settings
         self.scene = LynxSceneCfg(num_envs=1, env_spacing=2.5)
 
         # Simulation settings
-        self.sim.dt = 1.0 / 60.0  # 120 Hz
-        self.sim.physics_material = sim_utils.RigidBodyMaterialCfg(
-            static_friction=1.5,
-            dynamic_friction=1.2,
-            restitution=0.0,
-        )
-        # self.sim.gravity = (0.0, 0.0, -9.81)
-        self.decimation = 1        # 120 Hz policy frequency for direct control
-        self.sim.render_interval = 1 
+        # Physics runs at 100Hz (dt=0.01)
+        self.sim.dt = 0.01
+        
+        # Control frequency is 5Hz (dt=0.2s)
+        # Decimation = Control DT / Sim DT = 0.2 / 0.01 = 20
+        self.decimation = 20
+        
+        self.sim.render_interval = 1
 
         # Action settings
         self.actions = LynxActionsCfg()
@@ -138,58 +119,75 @@ class LynxPosControlTestEnvCfg(ManagerBasedEnvCfg):
 def main():
     """Main function."""
     # Create environment configuration
-    env_cfg = LynxPosControlTestEnvCfg()
+    env_cfg = Lynx5HzControlEnvCfg()
     
     # Create environment
     env = ManagerBasedEnv(cfg=env_cfg)
 
-    print(f"[INFO]: Resolved action dimension: {env.action_manager.total_action_dim}")
-    print(f"[INFO]: Default joint positions: {env.scene['robot'].data.default_joint_pos}")
+    # Get number of joints from the robot asset
+    num_joints = env.scene["robot"].num_joints
 
-    # Play the simulator
-    print("[INFO]: Simulation setup complete. Running staged Lynx position-control validation...")
-
-    # Simulation loop
-    num_joints = env.action_manager.total_action_dim
+    # Velocity limits (rad/s)
+    # Mega M1 (Joints 1-2): np.radians(20.0)
+    # Standard S1 (Joints 3-4): np.radians(20.0)
+    # Lite L1 (Joints 5-6): np.radians(20.0)
+    velocity_limits = torch.tensor([np.radians(20.0)] * num_joints, device=env.device)
     
-    # Initialize target position
-    target_pos = torch.zeros((env.num_envs, num_joints), device=env.device)
+    # Control DT (5Hz)
+    control_dt = 0.2
+    
+    # Max delta position per control step
+    max_delta_pos = velocity_limits * control_dt
 
+    print(f"[INFO]: Control Frequency: {1.0/control_dt} Hz (dt={control_dt}s)")
+    print(f"[INFO]: Velocity Limits: {velocity_limits}")
+    print(f"[INFO]: Max Delta Pos per step: {max_delta_pos}")
+
+    # Initialize target position (absolute)
+    # We start at the default joint positions
+    current_joint_pos = env.scene["robot"].data.joint_pos.clone()
+    
     # Simulate
     step_idx = 0
     while simulation_app.is_running():
-        # Staged test: hold, then per-joint bounded excitations, then mild random commands.
-        phase = (step_idx // 240) % (num_joints + 2)
-        if phase == 0:
-            target_pos.zero_()
-        elif 1 <= phase <= num_joints:
-            target_pos.zero_()
-            joint_id = phase - 1
-            target_pos[:, joint_id] = 0.02 * math.sin(step_idx * env_cfg.sim.dt)
-        else:
-            target_pos = (torch.rand((env.num_envs, num_joints), device=env.device) - 0.5) * 0.02
-
-        if step_idx % 120 == 0:
-            print(f"Step: {step_idx}, Target Joint Pos (relative): {target_pos}")
-
-        # Step environment
-        env.step(target_pos)
+        # Generate a random desired position (absolute)
+        # For testing, let's oscillate between -0.5 and 0.5 rad
+        desired_pos = 10 * torch.sin(torch.ones((env.num_envs, num_joints), device=env.device) * step_idx * 3)
         
-        # Optional: print current joint positions to see if they reach the target
-        if step_idx % 60 == 0:
-            current_pos = env.scene["robot"].data.joint_pos
-            current_target = env.scene["robot"].data.joint_pos_target
-            print(f"Step: {step_idx}, Current Joint Pos: {current_pos}")
-            print(f"Step: {step_idx}, Current Joint Pos Target: {current_target}")
+        # Get current position from sim
+        current_pos = env.scene["robot"].data.joint_pos
+        
+        # Calculate required delta
+        delta_pos = desired_pos - current_pos
+        
+        # Clip delta based on velocity limits
+        clipped_delta = torch.clamp(delta_pos, -max_delta_pos, max_delta_pos)
+        
+        # New target position
+        target_pos = current_pos + clipped_delta
+        
+        # The JointPositionAction expects targets relative to default or absolute depending on config.
+        # In LynxActionsCfg, use_default_offset=True, so env.step(action) adds action to default_joint_pos.
+        # We want to provide (target_pos - default_joint_pos) as the action.
+        action = target_pos - env.scene["robot"].data.default_joint_pos
+        
+        # Step environment
+        env.step(action)
+        
+        # Logging
+        if step_idx % 5 == 0: # Every 1 second at 5Hz
+            applied_efforts = env.scene["robot"].data.applied_torque
+            print(f"--- Step {step_idx} ---")
+            print(f"Desired Pos: {desired_pos[0].cpu().numpy()}")
+            print(f"Current Pos: {current_pos[0].cpu().numpy()}")
+            print(f"Target Pos (clipped): {target_pos[0].cpu().numpy()}")
+            print(f"Applied Torque: {applied_efforts[0].cpu().numpy()}")
         
         step_idx += 1
 
     print("[INFO]: Simulation finished.")
     env.close()
 
-
 if __name__ == "__main__":
-    # run the main function
     main()
-    # close sim app
     simulation_app.close()
