@@ -14,6 +14,8 @@
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v0 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v2 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Open-Drawer-Franka-v0 --distributed --headless --num_envs 16384
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --distributed --headless --num_envs 16384
+
 
 # also works for 4070 ti super (16GB VRAM), the observation excludes joint velocities:
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v1 --distributed --headless --num_envs 16384
@@ -25,8 +27,11 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v3
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v4 --num_envs 1024
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v4 --num_envs 16384 --headless
 
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Mujoco-v0 --num_envs 1024  # Isaac-Lift-Cube-OpenArm-v0
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Lift-Cube-Franka-v0 --num_envs 1024
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Mujoco-v0 --num_envs 1024  # Isaac-Lift-Cube-OpenArm-v0; Isaac-Stack-Cube-Franka-v0; Isaac-Lift-Cube-Franka-v0
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Lift-Cube-Franka-v0 --num_envs 16384 --headless
+
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --num_envs 1024
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --num_envs 16384 --headless
 
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Trapezoidal-v0 --num_envs 1024 --headless
@@ -43,3 +48,10 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-v3 
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Reach-Lynx-Trapezoidal-v0 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2026-03-10_16-19-00 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/LynxReach/2026-03-10_16-19-00/model_500.pt
 
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-v0 --num_envs 32 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-15_01-25-19 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-15_01-25-19/model_1499.pt
+
+# Recommended high-throughput play command (reduced render + optimized PLAY env cfg):
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-Play-v0 --num_envs 32 --headless --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-15_01-25-19 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-15_01-25-19/model_1499.pt
+
+# Interactive debug command (GUI, fewer envs for smooth viewport):
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-Play-v0 --num_envs 8 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-16_15-50-14 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-16_15-50-14/model_250.pt

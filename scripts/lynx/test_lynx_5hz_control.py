@@ -102,11 +102,11 @@ class Lynx5HzControlEnvCfg(ManagerBasedEnvCfg):
 
         # Simulation settings
         # Physics runs at 100Hz (dt=0.01)
-        self.sim.dt = 0.01
+        self.sim.dt = 1.0 / 60.0
         
         # Control frequency is 5Hz (dt=0.2s)
         # Decimation = Control DT / Sim DT = 0.2 / 0.01 = 20
-        self.decimation = 20
+        self.decimation = 12
         
         self.sim.render_interval = 1
 

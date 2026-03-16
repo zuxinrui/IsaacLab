@@ -65,32 +65,40 @@ class LynxRobotCfg(ArticulationCfg):
     # clamp_length: float = 0.051
     # B-Spline Tube Parameters
     bspline_num_segments: int = 50
+    # Collision mode for procedurally generated geometry.
+    # - "ee_only": only end-effector geometries are collidable (fastest for RL throughput)
+    # - "full": all generated robot body geometries are collidable
+    collision_mode: str = "full"
     # Paths to STLs (assuming they will be provided or are in a known location)
     clamp_stl: str = "source/isaaclab_assets/data/Robots/Lynx/models/clamp_0226.stl"
     ee_stl: Optional[str] = None
     
     # Physics/Actuation
+    joint_position_limit_deg: float = 180.0
+    joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s
+    joint_acceleration_limit_rad_s2: float = 1.7453292519943295  # 100 deg/s^2
+
     # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.
     # IsaacLab will write these values to the USD DriveAPI "angular" channel at runtime.
     actuators: dict[str, ImplicitActuatorCfg] = {
         "lynx_arm_mega": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-2]"],
             effort_limit_sim=130.0,
-            velocity_limit_sim=np.radians(20.0),
+            velocity_limit_sim=0.3490658503988659,
             stiffness=800.0,
             damping=40.0,
         ),
         "lynx_arm_standard": ImplicitActuatorCfg(
             joint_names_expr=["joint_[3-4]"],
             effort_limit_sim=54.0,
-            velocity_limit_sim=np.radians(90.0),
+            velocity_limit_sim=0.3490658503988659,
             stiffness=800.0,
             damping=40.0,
         ),
         "lynx_arm_lite": ImplicitActuatorCfg(
             joint_names_expr=["joint_[5-6]"],
             effort_limit_sim=19.0,
-            velocity_limit_sim=np.radians(150.0),
+            velocity_limit_sim=0.3490658503988659,
             stiffness=800.0,
             damping=40.0,
         ),
@@ -259,6 +267,11 @@ class LynxUsdConstructor:
             return (i_radial, i_axial, i_radial)
         return (i_radial, i_radial, i_axial)
 
+    def _sphere_inertia(self, mass: float, radius: float) -> tuple[float, float, float]:
+        """Approximate solid-sphere inertia around its center of mass."""
+        i = 0.4 * mass * radius * radius
+        return (i, i, i)
+
     def _box_inertia(self, mass: float, size: tuple[float, float, float]) -> tuple[float, float, float]:
         """Approximate cuboid inertia around its center of mass."""
         sx, sy, sz = size
@@ -353,9 +366,21 @@ class LynxUsdConstructor:
             joint_physx_api.CreateJointFrictionAttr(0.0)
         if actuator_cfg.velocity_limit_sim is not None:
             if joint_physx_api.GetMaxJointVelocityAttr().HasAuthoredValueOpinion():
-                joint_physx_api.GetMaxJointVelocityAttr().Set(actuator_cfg.velocity_limit_sim)
+                joint_physx_api.GetMaxJointVelocityAttr().Set(self.cfg.joint_velocity_limit_rad_s)
             else:
-                joint_physx_api.CreateMaxJointVelocityAttr(actuator_cfg.velocity_limit_sim)
+                joint_physx_api.CreateMaxJointVelocityAttr(self.cfg.joint_velocity_limit_rad_s)
+
+        # Set acceleration limit when supported by the installed PhysX schema.
+        # Target: 100 deg/s^2 == 1.7453292519943295 rad/s^2.
+        get_acc_attr = getattr(joint_physx_api, "GetMaxJointAccelerationAttr", None)
+        create_acc_attr = getattr(joint_physx_api, "CreateMaxJointAccelerationAttr", None)
+        if callable(get_acc_attr) and callable(create_acc_attr):
+            acc_attr = get_acc_attr()
+            if hasattr(acc_attr, "HasAuthoredValueOpinion") and hasattr(acc_attr, "Set"):
+                if acc_attr.HasAuthoredValueOpinion():
+                    acc_attr.Set(self.cfg.joint_acceleration_limit_rad_s2)
+                else:
+                    create_acc_attr(self.cfg.joint_acceleration_limit_rad_s2)
 
         return drive, joint_physx_api
 
@@ -380,6 +405,23 @@ class LynxUsdConstructor:
                     joint's axis is expressed correctly.
         """
         stage = sim_utils.get_current_stage()
+        non_colliding_cfg = sim_utils.CollisionPropertiesCfg(collision_enabled=False)
+        collidable_cfg = sim_utils.CollisionPropertiesCfg()
+        body_collision_cfg = collidable_cfg if self.cfg.collision_mode == "full" else non_colliding_cfg
+
+        # Pre-define materials to avoid hitting the 64K PhysX material limit in large batched scenes.
+        # By using the same config object, Isaac Lab's spawner will reuse the material prim if it's already created.
+        black_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+        grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3))
+        dark_grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
+        ee_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.15, 0.15, 0.15))
+        red_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2))
+        shared_physics_material = sim_utils.spawners.materials.RigidBodyMaterialCfg(
+            static_friction=0.7,
+            dynamic_friction=0.7,
+            restitution=0.0,
+        )
+        shared_physics_material_path = "/World/PhysicsMaterials/lynx_shared"
 
         # Pro Arm 900 Physical Parameters
         pro_arm_900_params = {
@@ -470,8 +512,10 @@ class LynxUsdConstructor:
             sim_utils.spawners.MeshCylinderCfg(
                 radius=base_radius1,
                 height=base_length1,
-                collision_props=sim_utils.CollisionPropertiesCfg(),
-                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0)),
+                collision_props=non_colliding_cfg,
+                physics_material_path=shared_physics_material_path,
+                physics_material=shared_physics_material,
+                visual_material=black_material,
             ),
             translation=(0, 0, base_length1 / 2),
         )
@@ -480,8 +524,10 @@ class LynxUsdConstructor:
             sim_utils.spawners.MeshCylinderCfg(
                 radius=base_radius2,
                 height=base_length2,
-                collision_props=sim_utils.CollisionPropertiesCfg(),
-                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0)),
+                collision_props=non_colliding_cfg,
+                physics_material_path=shared_physics_material_path,
+                physics_material=shared_physics_material,
+                visual_material=black_material,
             ),
             translation=(0, 0, base_length1 + base_length2 / 2),
         )
@@ -517,10 +563,16 @@ class LynxUsdConstructor:
             {"l0": 0.029, "r0": 0.04, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
         ]
 
-        joint_limits_deg = [(-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0), (-180.0, 180.0)]
+        joint_limits_deg = [
+            (-self.cfg.joint_position_limit_deg, self.cfg.joint_position_limit_deg),
+            (-self.cfg.joint_position_limit_deg, self.cfg.joint_position_limit_deg),
+            (-self.cfg.joint_position_limit_deg, self.cfg.joint_position_limit_deg),
+            (-self.cfg.joint_position_limit_deg, self.cfg.joint_position_limit_deg),
+            (-self.cfg.joint_position_limit_deg, self.cfg.joint_position_limit_deg),
+            (-self.cfg.joint_position_limit_deg, self.cfg.joint_position_limit_deg),
+        ]
         
         # Legacy target masses for procedural approximations (tubes)
-        link_target_masses = [4.5, 4.5, 1.52, 1.52, 1.1, 1.1]
         tube_target_masses = [0.0, 0.35, 0.0, 0.35, 0.0]
 
         genotype_tube = self.cfg.genotype_tube[:num_joints-1]
@@ -633,8 +685,10 @@ class LynxUsdConstructor:
                         sim_utils.spawners.MeshCylinderCfg(
                             radius=tube_radius,
                             height=seg_len,
-                            collision_props=sim_utils.CollisionPropertiesCfg(),
-                            visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1)),
+                            collision_props=body_collision_cfg,
+                            physics_material_path=shared_physics_material_path,
+                            physics_material=shared_physics_material,
+                            visual_material=dark_grey_material,
                         ),
                         translation=tuple(seg_center),
                         orientation=self._quat_to_tuple(seg_quat)
@@ -695,8 +749,10 @@ class LynxUsdConstructor:
                     f"{link_path}/fixed_visual",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r0"], height=p["l0"],
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3))
+                        collision_props=body_collision_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=grey_material
                     ),
                     translation=(0, 0, p["l0"] / 2)
                 )
@@ -727,8 +783,10 @@ class LynxUsdConstructor:
                     f"{link_path}/moving_visual_main",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r1"], height=p["l1"],
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                        collision_props=body_collision_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=black_material
                     ),
                     translation=tuple(joint_pos)
                 )
@@ -737,8 +795,10 @@ class LynxUsdConstructor:
                     f"{link_path}/moving_visual_attach_add",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r2"], height=p["r1"],
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                        collision_props=non_colliding_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=black_material
                     ),
                     translation=tuple(cylinder2_add_pos),
                     orientation=self._quat_to_tuple(new_relative_quat)
@@ -748,8 +808,10 @@ class LynxUsdConstructor:
                     f"{link_path}/moving_visual_attach",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=p["r2"], height=p["l2"],
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                        collision_props=non_colliding_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=black_material
                     ),
                     translation=tuple(cylinder2_pos),
                     orientation=self._quat_to_tuple(new_relative_quat)
@@ -792,8 +854,10 @@ class LynxUsdConstructor:
                     f"{link_path}/fixed_visual_0",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r0_orig, height=l0_orig,
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                        collision_props=non_colliding_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=black_material
                     ),
                     translation=tuple(cylinder0_pos)
                 )
@@ -801,8 +865,10 @@ class LynxUsdConstructor:
                     f"{link_path}/fixed_visual_add",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r0_orig, height=r1,
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                        collision_props=non_colliding_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=black_material
                     ),
                     translation=tuple(cylinder0_add_pos)
                 )
@@ -812,8 +878,10 @@ class LynxUsdConstructor:
                     f"{link_path}/fixed_visual_shell",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r1, height=l1,
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
+                        collision_props=body_collision_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=black_material
                     ),
                     translation=tuple(joint_pos_rel),
                     orientation=self._quat_to_tuple(new_relative_quat)
@@ -839,8 +907,10 @@ class LynxUsdConstructor:
                     f"{link_path}/moving_visual",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r2_orig, height=l2_orig,
-                        collision_props=sim_utils.CollisionPropertiesCfg(),
-                        visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3))
+                        collision_props=body_collision_cfg,
+                        physics_material_path=shared_physics_material_path,
+                        physics_material=shared_physics_material,
+                        visual_material=grey_material
                     ),
                     translation=tuple(cylinder2_pos_rel),
                     orientation=self._quat_to_tuple(new_relative_quat)
@@ -868,7 +938,7 @@ class LynxUsdConstructor:
 
         # 3. End Effector
         ee_cyl_length = 0.07
-        ee_cyl_radius = 0.010
+        ee_cyl_radius = 0.01
         ee_cyl_path = f"{root_path}/ee_cylinder"
         sim_utils.create_prim(ee_cyl_path, prim_type="Xform")
         ee_cyl_prim = stage.GetPrimAtPath(ee_cyl_path)
@@ -885,8 +955,10 @@ class LynxUsdConstructor:
             sim_utils.spawners.MeshCylinderCfg(
                 radius=ee_cyl_radius,
                 height=ee_cyl_length,
-                collision_props=sim_utils.CollisionPropertiesCfg(),
-                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.15, 0.15, 0.15))
+                collision_props=collidable_cfg,
+                physics_material_path=shared_physics_material_path,
+                physics_material=shared_physics_material,
+                visual_material=ee_material
             ),
             translation=(0, 0, ee_cyl_length / 2)
         )
@@ -897,22 +969,25 @@ class LynxUsdConstructor:
         sim_utils.create_prim(ee_path, prim_type="Xform")
         ee_prim = stage.GetPrimAtPath(ee_path)
         UsdPhysics.RigidBodyAPI.Apply(ee_prim)
-        ee_mass = 0.45
+        ee_mass = 0.01
+        ee_radius = 0.01
         self._apply_mass_properties(
             ee_prim,
             mass=ee_mass,
-            diagonal_inertia=self._box_inertia(ee_mass, (0.05, 0.05, 0.05)),
+            diagonal_inertia=self._sphere_inertia(ee_mass, ee_radius),
             center_of_mass=(0.0, 0.0, 0.0),
         )
-        sim_utils.spawners.meshes.spawn_mesh_cuboid(
+        sim_utils.spawners.meshes.spawn_mesh_sphere(
             f"{ee_path}/visual",
-            sim_utils.spawners.MeshCuboidCfg(
-                size=(0.05, 0.05, 0.05),
-                collision_props=sim_utils.CollisionPropertiesCfg(),
-                visual_material=sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.2, 0.8, 0.2))
+            sim_utils.spawners.MeshSphereCfg(
+                radius=ee_radius,
+                collision_props=non_colliding_cfg,
+                physics_material_path=shared_physics_material_path,
+                physics_material=shared_physics_material,
+                visual_material=red_material
             )
         )
-        self._create_fixed_joint(f"{ee_path}/fixed_joint", ee_cyl_path, ee_path, Gf.Vec3f(0, 0, ee_cyl_length / 2), Gf.Quatf(1, 0, 0, 0))
+        self._create_fixed_joint(f"{ee_path}/fixed_joint", ee_cyl_path, ee_path, Gf.Vec3f(0, 0, ee_cyl_length), Gf.Quatf(1, 0, 0, 0))
 
     def _create_fixed_joint(self, path, body0, body1, pos, quat):
         stage = sim_utils.get_current_stage()
@@ -926,3 +1001,9 @@ class LynxUsdConstructor:
 
 # Register the spawn function
 LynxUsdConstructorSpawnerCfg.func = LynxUsdConstructor.spawn
+
+# Expose a module-level alias for Hydra/OmegaConf round-trip serialization.
+# When callables are serialized through `callable_to_string`, static methods are
+# represented as `<module>:<function_name>` (without class qualifier), so we
+# provide `spawn` on the module to make deserialization resolve correctly.
+spawn = LynxUsdConstructor.spawn
