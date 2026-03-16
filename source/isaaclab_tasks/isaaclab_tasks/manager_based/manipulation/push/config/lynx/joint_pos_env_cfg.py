@@ -7,7 +7,7 @@
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import RigidObjectCfg
-from isaaclab.sensors import FrameTransformerCfg
+from isaaclab.sensors import ContactSensorCfg, FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim import CuboidCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
@@ -39,6 +39,8 @@ def _make_lynx_robot_cfg() -> LynxRobotCfg:
         disable_gravity=False,
         max_depenetration_velocity=5.0,
     )
+    # Enable contact sensors for the robot
+    robot_cfg.spawn.activate_contact_sensors = True
     robot_cfg.spawn.func = LynxUsdConstructor.spawn
     robot_cfg.spawn.robot_cfg = {
         "genotype_tube": robot_cfg.genotype_tube,
@@ -53,6 +55,7 @@ def _make_lynx_robot_cfg() -> LynxRobotCfg:
         "init_state": robot_cfg.init_state,
         "rigid_props": robot_cfg.spawn.rigid_props,
         "articulation_props": robot_cfg.spawn.articulation_props,
+        "activate_contact_sensors": robot_cfg.spawn.activate_contact_sensors,
     }
     return robot_cfg
 
@@ -84,11 +87,10 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         self.scene.robot = _make_lynx_robot_cfg()
 
         # Set actions for the Lynx robot (joint position control)
-        self.actions.arm_action = mdp.JointPositionActionCfg(
+        self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
             asset_name="robot",
             joint_names=["joint_[1-6]"],
-            scale=0.5,
-            use_default_offset=True,
+            scale=0.1745,  # 10 degrees in radians
         )
 
         # Set Cube as the object to push
@@ -161,6 +163,14 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
                     ),
                 ),
             ],
+        )
+
+        # Set up contact sensor for the robot
+        self.scene.contact_forces = ContactSensorCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/.*",
+            update_period=0.0,
+            history_length=3,
+            debug_vis=False,
         )
 
 

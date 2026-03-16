@@ -15,7 +15,7 @@ from isaaclab.utils import configclass
 from pxr import PhysxSchema, Usd, UsdGeom, UsdPhysics, Gf
 
 @configclass
-class LynxUsdConstructorSpawnerCfg(sim_utils.SpawnerCfg):
+class LynxUsdConstructorSpawnerCfg(sim_utils.RigidObjectSpawnerCfg):
     """Configuration for the Lynx USD constructor spawner."""
     func: Any = None # Will be set to LynxUsdConstructor.spawn
     robot_cfg: Optional[Any] = None
@@ -36,24 +36,24 @@ class LynxRobotCfg(ArticulationCfg):
     # Genotypes
     num_joints: int = 6
     genotype_tube: List[int] = [0, 1, 0, 1, 0]
-    genotype_joints: int = 1 # 0: all orthogonal, 1: all inline, 2: mixed (from spec)
+    genotype_joints: int = 1 # [0-5], default: 1
     rotation_angles: List[float] = [180.0, 0.0, 0.0, -180.0, 0.0, 0.0]
     
     # Tube 1:
     l1_end_point_pos: tuple = (0.0, 0.0, 0.36)
     l1_end_point_theta: float = 0.0
     # Tube 2:
-    l2_end_point_pos: tuple = (0.0, 0.1, 0.2805)
-    l2_end_point_theta: float = 0.0
+    l2_end_point_pos: tuple = (0.2, 0.2, 0.2805)
+    l2_end_point_theta: float = 90.0
     # Tube 3:
-    l3_end_point_pos: tuple = (0.0, 0.0, 0.36)
-    l3_end_point_theta: float = 0.0
+    l3_end_point_pos: tuple = (0.0, 0.2, 0.36)
+    l3_end_point_theta: float = 20.0
     # Tube 4:
-    l4_end_point_pos: tuple = (0.0, 0.1, 0.2805)
-    l4_end_point_theta: float = 0.0
+    l4_end_point_pos: tuple = (0.0, 0.2, 0.2805)
+    l4_end_point_theta: float = 90.0
     # Tube 5:
-    l5_end_point_pos: tuple = (0.0, 0.0, 0.36)
-    l5_end_point_theta: float = 0.0
+    l5_end_point_pos: tuple = (0.0, 0.20, 0.36)
+    l5_end_point_theta: float = 20.0
 
     # Other tube parameters:
     bspline_dual_point_distance: float = 0.07
@@ -222,6 +222,8 @@ class LynxUsdConstructor:
                     robot_cfg_obj.spawn.rigid_props = robot_cfg["rigid_props"]
                 if "articulation_props" in robot_cfg:
                     robot_cfg_obj.spawn.articulation_props = robot_cfg["articulation_props"]
+                if "activate_contact_sensors" in robot_cfg:
+                    robot_cfg_obj.spawn.activate_contact_sensors = robot_cfg["activate_contact_sensors"]
                 robot_cfg = robot_cfg_obj
             constructor = LynxUsdConstructor(robot_cfg)
         elif isinstance(cfg, LynxRobotCfg):
@@ -477,6 +479,11 @@ class LynxUsdConstructor:
         # Apply rigid body properties if provided
         if hasattr(self.cfg.spawn, "rigid_props") and self.cfg.spawn.rigid_props is not None:
             sim_utils.define_rigid_body_properties(base_path, self.cfg.spawn.rigid_props)
+        
+        # Apply contact reporter if requested
+        if getattr(self.cfg.spawn, "activate_contact_sensors", False):
+            if not base_prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
+                PhysxSchema.PhysxContactReportAPI.Apply(base_prim)
 
         # FIX: Fix the base to the WORLD by leaving body0 empty (no targets).
         # Pointing body0 at a plain Xform (non-rigid-body) is not valid in PhysX
@@ -577,6 +584,7 @@ class LynxUsdConstructor:
 
         genotype_tube = self.cfg.genotype_tube[:num_joints-1]
         tube_idx = 0
+        # final_link_name = f"link_{num_joints}"
         for i in range(num_joints):
             # 1. Check if we need to insert a tube BEFORE this joint (except joint 1)
             if i > 0 and tube_idx < len(genotype_tube) and genotype_tube[tube_idx] == 1:
@@ -585,6 +593,10 @@ class LynxUsdConstructor:
                 sim_utils.create_prim(tube_path, prim_type="Xform")
                 tube_prim = stage.GetPrimAtPath(tube_path)
                 UsdPhysics.RigidBodyAPI.Apply(tube_prim)
+                # Apply contact reporter if requested
+                if getattr(self.cfg.spawn, "activate_contact_sensors", False):
+                    if not tube_prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
+                        PhysxSchema.PhysxContactReportAPI.Apply(tube_prim)
                 # Add explicit mass/inertia to the tube after geometry is known
                 
                 tube_radius = self.cfg.tube_radiuses[tube_idx]
@@ -723,6 +735,10 @@ class LynxUsdConstructor:
             sim_utils.create_prim(link_path, prim_type="Xform")
             link_prim = stage.GetPrimAtPath(link_path)
             UsdPhysics.RigidBodyAPI.Apply(link_prim)
+            # Apply contact reporter if requested
+            if getattr(self.cfg.spawn, "activate_contact_sensors", False):
+                if not link_prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
+                    PhysxSchema.PhysxContactReportAPI.Apply(link_prim)
             # Apply rigid body properties if provided
             if hasattr(self.cfg.spawn, "rigid_props") and self.cfg.spawn.rigid_props is not None:
                 sim_utils.define_rigid_body_properties(link_path, self.cfg.spawn.rigid_props)
@@ -764,16 +780,20 @@ class LynxUsdConstructor:
                 joint.CreateBody0Rel().SetTargets([curr_parent_path])
                 joint.CreateBody1Rel().SetTargets([link_path])
                 
+                # Flip the joint direction by rotating the joint frame 180 degrees around X.
+                # This reverses the positive rotation direction.
+                flip_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(1, 0, 0), 180).GetQuat())
+
                 # localPos0/localRot0: joint frame expressed in parent body's local frame.
                 # curr_pos is the attachment point in the parent body's local frame.
                 # curr_quat is the joint frame orientation in the parent body's local frame.
                 joint.CreateLocalPos0Attr().Set(curr_pos)
-                joint.CreateLocalRot0Attr().Set(curr_quat)
+                joint.CreateLocalRot0Attr().Set(curr_quat * flip_quat)
                 # localPos1/localRot1: joint frame expressed in child body's local frame.
                 # Child body is at world origin with identity orientation, so the joint
                 # attachment in the child frame is at the origin with identity rotation.
                 joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))
-                joint.CreateLocalRot1Attr().Set(Gf.Quatf(1, 0, 0, 0))
+                joint.CreateLocalRot1Attr().Set(flip_quat)
                 joint.CreateCollisionEnabledAttr(False)
                 self._set_joint_limits(joint, *joint_limits_deg[i])
                 sim_utils.safe_set_attribute_on_usd_prim(stage.GetPrimAtPath(joint_path), "physics:jointEnabled", True, camel_case=True)
@@ -844,14 +864,34 @@ class LynxUsdConstructor:
                 rx = Gf.Quatf(Gf.Rotation(Gf.Vec3d(1, 0, 0), 90).GetQuat())
                 twist = Gf.Quatf(Gf.Rotation(Gf.Vec3d(0, 0, 1), np.rad2deg(angle_rad)).GetQuat())
                 new_relative_quat = twist * rx
+                # MuJoCo JointOrthogonal hinge axis is rotated by `new_relative_quat`:
+                #     axis_child = new_relative_quat * [0, 0, -1].
+                # USD revolute uses principal-axis token (X/Y/Z), so we encode this by rotating
+                # both joint frames with the same axis-frame rotation:
+                #   - localRot1: axis frame in child body local
+                #   - localRot0: same frame expressed in parent "accumulated" frame
+                orth_axis_frame_parent = curr_quat * new_relative_quat
                 
                 cylinder0_pos = Gf.Vec3f(0, 0, l0_orig / 2)
                 cylinder0_add_pos = Gf.Vec3f(0, 0, l0_orig + r1 / 2)
                 joint_pos_rel = Gf.Vec3f(0, 0, l0_orig + r1)
-                cylinder2_pos_rel = joint_pos_rel + new_relative_quat.Transform(Gf.Vec3f(0, 0, l1 / 2 + l2_orig / 2))
+                cylinder2_pos_rel = joint_pos_rel + new_relative_quat.Transform(
+                    Gf.Vec3f(0, 0, l1 / 2 + l2_orig / 2)
+                )
+
+                # Parent-frame joint axis frame and parent-side fixed-geometry poses.
+                fixed_cylinder0_pos_parent = curr_pos + curr_quat.Transform(cylinder0_pos - joint_pos_rel)
+                fixed_cylinder0_add_pos_parent = curr_pos + curr_quat.Transform(cylinder0_add_pos - joint_pos_rel)
+                # Uniform module shift in world-up. Applying exactly the same shift to fixed,
+                # joint anchors, moving part, and next curr_pos preserves relative geometry.
+                # IMPORTANT: avoid cumulative over-shift only for truly consecutive
+                # orthogonal joints. If there is a tube between joints, treat as non-consecutive.
+                prev_has_tube = i > 0 and (i - 1) < len(self.cfg.genotype_tube) and bool(self.cfg.genotype_tube[i - 1])
+                prev_is_orthogonal = i > 0 and joint_types[i - 1] == "orthogonal" and not prev_has_tube
+                orth_module_shift = Gf.Vec3f(0, -(l0_orig + r1), 0.0) if not prev_has_tube else curr_quat.Transform(Gf.Vec3f(0, 0, l0_orig + r1))
 
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
-                    f"{link_path}/fixed_visual_0",
+                    f"{curr_parent_path}/{joint_name}_fixed_visual_0",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r0_orig, height=l0_orig,
                         collision_props=non_colliding_cfg,
@@ -859,10 +899,11 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=black_material
                     ),
-                    translation=tuple(cylinder0_pos)
+                    translation=tuple(fixed_cylinder0_pos_parent + orth_module_shift),
+                    orientation=self._quat_to_tuple(curr_quat)
                 )
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
-                    f"{link_path}/fixed_visual_add",
+                    f"{curr_parent_path}/{joint_name}_fixed_visual_add",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r0_orig, height=r1,
                         collision_props=non_colliding_cfg,
@@ -870,12 +911,13 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=black_material
                     ),
-                    translation=tuple(cylinder0_add_pos)
+                    translation=tuple(fixed_cylinder0_add_pos_parent + orth_module_shift),
+                    orientation=self._quat_to_tuple(curr_quat)
                 )
                 
                 # Joint shell (fixed)
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
-                    f"{link_path}/fixed_visual_shell",
+                    f"{curr_parent_path}/{joint_name}_fixed_visual_shell",
                     sim_utils.spawners.MeshCylinderCfg(
                         radius=r1, height=l1,
                         collision_props=body_collision_cfg,
@@ -883,8 +925,8 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=black_material
                     ),
-                    translation=tuple(joint_pos_rel),
-                    orientation=self._quat_to_tuple(new_relative_quat)
+                    translation=tuple(curr_pos + orth_module_shift),
+                    orientation=self._quat_to_tuple(orth_axis_frame_parent)
                 )
                 
                 # Revolute Joint
@@ -894,10 +936,15 @@ class LynxUsdConstructor:
                 joint.CreateBody0Rel().SetTargets([curr_parent_path])
                 joint.CreateBody1Rel().SetTargets([link_path])
                 
-                joint.CreateLocalPos0Attr().Set(curr_pos)
-                joint.CreateLocalRot0Attr().Set(curr_quat)
-                joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))
-                joint.CreateLocalRot1Attr().Set(Gf.Quatf(1, 0, 0, 0))
+                # Flip the joint direction by rotating the joint frame 180 degrees around X or Y.
+                # This reverses the positive rotation direction.
+                flip_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(1, 0, 0), 180).GetQuat())
+                
+                joint.CreateLocalPos0Attr().Set(curr_pos + orth_module_shift)
+                joint.CreateLocalRot0Attr().Set(orth_axis_frame_parent * flip_quat)
+                # Place the hinge at the center of fixed_visual_shell.
+                joint.CreateLocalPos1Attr().Set(joint_pos_rel + orth_module_shift)
+                joint.CreateLocalRot1Attr().Set(new_relative_quat * flip_quat)
                 joint.CreateCollisionEnabledAttr(False)
                 self._set_joint_limits(joint, *joint_limits_deg[i])
                 sim_utils.safe_set_attribute_on_usd_prim(stage.GetPrimAtPath(joint_path), "physics:jointEnabled", True, camel_case=True)
@@ -912,18 +959,19 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=grey_material
                     ),
-                    translation=tuple(cylinder2_pos_rel),
+                    translation=tuple(cylinder2_pos_rel + orth_module_shift),
+                    # Keep the moving visual aligned with the same joint frame used for the
+                    # orthogonal revolute axis, matching MuJoCo behavior.
                     orientation=self._quat_to_tuple(new_relative_quat)
                 )
                 
                 # Update curr for next iteration.
                 curr_parent_path = link_path
-                curr_pos = cylinder2_pos_rel + new_relative_quat.Transform(Gf.Vec3f(0, 0, l2_orig / 2))
-                # FIX: For orthogonal joints, accumulate the rotation correctly.
-                # The child body's output frame orientation is curr_quat (parent frame) composed
-                # with new_relative_quat (the local rotation introduced by this joint's geometry).
-                # Since all link prims are at the world origin, curr_quat from the previous step
-                # already encodes the accumulated world-frame orientation, so we compose:
+                curr_pos = cylinder2_pos_rel + orth_module_shift + new_relative_quat.Transform(
+                    Gf.Vec3f(0, 0, l2_orig / 2)
+                )
+                # Propagate the orthogonal joint-frame orientation so next joints are expressed
+                # in the same accumulated frame convention as MuJoCo.
                 curr_quat = new_relative_quat
 
                 # Apply Pro Arm 900 physical parameters
@@ -943,6 +991,10 @@ class LynxUsdConstructor:
         sim_utils.create_prim(ee_cyl_path, prim_type="Xform")
         ee_cyl_prim = stage.GetPrimAtPath(ee_cyl_path)
         UsdPhysics.RigidBodyAPI.Apply(ee_cyl_prim)
+        # Apply contact reporter if requested
+        if getattr(self.cfg.spawn, "activate_contact_sensors", False):
+            if not ee_cyl_prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
+                PhysxSchema.PhysxContactReportAPI.Apply(ee_cyl_prim)
         ee_cyl_mass = 0.35
         self._apply_mass_properties(
             ee_cyl_prim,
@@ -969,6 +1021,10 @@ class LynxUsdConstructor:
         sim_utils.create_prim(ee_path, prim_type="Xform")
         ee_prim = stage.GetPrimAtPath(ee_path)
         UsdPhysics.RigidBodyAPI.Apply(ee_prim)
+        # Apply contact reporter if requested
+        if getattr(self.cfg.spawn, "activate_contact_sensors", False):
+            if not ee_prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
+                PhysxSchema.PhysxContactReportAPI.Apply(ee_prim)
         ee_mass = 0.01
         ee_radius = 0.01
         self._apply_mass_properties(

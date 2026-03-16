@@ -17,7 +17,7 @@ import torch
 
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.sensors import FrameTransformer
+from isaaclab.sensors import ContactSensor, FrameTransformer
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -61,48 +61,55 @@ def undesired_robot_contacts(
     object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
     robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     ee_link_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names="ee_cylinder"),
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces"),
 ) -> torch.Tensor:
-    """Penalize contacts between the robot (excluding the end-effector) and the object.
+    """Penalize contacts between the robot (excluding the end-effector) and any other object.
 
     Args:
         env: The environment.
         threshold: The contact force threshold to consider a contact.
-        object_cfg: The object configuration. Defaults to SceneEntityCfg("object").
+        object_cfg: The object configuration (not used in this version). Defaults to SceneEntityCfg("object").
         robot_cfg: The robot configuration. Defaults to SceneEntityCfg("robot").
-        ee_link_cfg: The end-effector link configuration. Defaults to SceneEntityCfg("robot", body_names="ee_cylinder").
+        ee_link_cfg: The end-effector link configuration. Defaults to SceneEntityCfg("robot", body_names="ee").
+        sensor_cfg: The contact sensor configuration. Defaults to SceneEntityCfg("contact_forces").
 
     Returns:
         Penalty tensor of shape (num_envs,).
     """
-    robot: Articulation = env.scene[robot_cfg.name]
-
-    # Get contact forces on the robot: (num_envs, num_bodies, 3)
-    # We use body_link_vel_w as a proxy to check if the attribute exists, 
-    # but for contact forces we need to check if the robot has a contact sensor 
-    # or if we can use the net_forces_w from the articulation data if it's available.
-    # In some versions of Isaac Lab, ArticulationData has root_physx_view which has get_net_contact_forces()
-    
-    # Try to get contact forces from the root_physx_view if available
-    if hasattr(robot.data, "_root_physx_view"):
-        contact_forces = robot.data._root_physx_view.get_net_contact_forces()
-    else:
-        # Fallback to a zero tensor if we can't find contact forces
-        return torch.zeros(env.num_envs, device=robot.device)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # Get net contact forces: (num_envs, num_bodies, 3)
+    contact_forces = contact_sensor.data.net_forces_w
 
     # Get the indices of the bodies to exclude (end-effector)
+    # Note: sensor_cfg.body_ids are indices into the sensor's tracked bodies.
+    # If the sensor tracks all robot bodies, we need to find the index of "ee".
     ee_link_indices = ee_link_cfg.body_ids
 
     # Create a mask for all bodies except the end-effector
+    if contact_forces is None or contact_forces.numel() == 0:
+        return torch.zeros(env.num_envs, device=contact_sensor.device)
+
     num_bodies = contact_forces.shape[1]
-    mask = torch.ones(num_bodies, dtype=torch.bool, device=robot.device)
+    mask = torch.ones(num_bodies, dtype=torch.bool, device=contact_sensor.device)
+    # Handle multiple indices if ee_link_cfg.body_ids is a list/tensor
     mask[ee_link_indices] = False
 
     # Sum the contact force magnitudes for all other bodies
     non_ee_contact_forces = contact_forces[:, mask, :]
     non_ee_contact_mag = torch.norm(non_ee_contact_forces, dim=-1).max(dim=-1)[0]
+    undesired_contact_mask = non_ee_contact_mag > threshold
+
+    # Optional debug logging: summarize undesired contacts across vectorized environments.
+    # if torch.any(undesired_contact_mask):
+    #     max_force = non_ee_contact_mag.max().item()
+    #     num_triggered = undesired_contact_mask.sum().item()
+    #     print(
+    #         f"Warning: Undesired robot contact detected in {num_triggered} env(s); "
+    #         f"max non-EE contact force={max_force:.2f} (threshold={threshold:.2f})."
+    #     )
 
     # Return 1.0 if any non-EE body has contact force above threshold, 0.0 otherwise
-    return (non_ee_contact_mag > threshold).float()
+    return undesired_contact_mask.float()
 
 
 def object_goal_distance(
