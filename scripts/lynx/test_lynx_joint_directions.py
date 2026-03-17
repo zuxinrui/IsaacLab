@@ -177,6 +177,7 @@ def main():
                 print(f"    Finished {joint_names[current_joint_idx]}. Pausing...")
         
         # Step environment
+        # print(f"action: {action}")
         env.step(action)
         
         step_idx += 1

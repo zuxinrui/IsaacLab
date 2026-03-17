@@ -40,25 +40,25 @@ class LynxRobotCfg(ArticulationCfg):
     rotation_angles: List[float] = [180.0, 0.0, 0.0, -180.0, 0.0, 0.0]
     
     # Tube 1:
-    l1_end_point_pos: tuple = (0.0, 0.0, 0.36)
+    l1_end_point_pos: tuple = (0.0, 0.0, 0.2)
     l1_end_point_theta: float = 0.0
     # Tube 2:
-    l2_end_point_pos: tuple = (0.2, 0.2, 0.2805)
-    l2_end_point_theta: float = 90.0
+    l2_end_point_pos: tuple = (0.0, 0.0, 0.2805)
+    l2_end_point_theta: float = 0.0
     # Tube 3:
-    l3_end_point_pos: tuple = (0.0, 0.2, 0.36)
-    l3_end_point_theta: float = 20.0
+    l3_end_point_pos: tuple = (0.0, 0.0, 0.2)
+    l3_end_point_theta: float = 0.0
     # Tube 4:
-    l4_end_point_pos: tuple = (0.0, 0.2, 0.2805)
-    l4_end_point_theta: float = 90.0
+    l4_end_point_pos: tuple = (0.0, 0.0, 0.2805)
+    l4_end_point_theta: float = 0.0
     # Tube 5:
-    l5_end_point_pos: tuple = (0.0, 0.20, 0.36)
-    l5_end_point_theta: float = 20.0
+    l5_end_point_pos: tuple = (0.0, 0.0, 0.2)
+    l5_end_point_theta: float = 0.0
 
     # Other tube parameters:
-    bspline_dual_point_distance: float = 0.07
-    mounting_length_start: float = 0.045
-    mounting_length_end: float = 0.045
+    bspline_dual_point_distance: float = 0.05
+    mounting_length_start: float = 0.0359  # clamp_1217.stl
+    mounting_length_end: float = 0.0359
     
     # Geometric Parameters
     tube_radiuses: List[float] = [0.0396] * 5
@@ -414,7 +414,11 @@ class LynxUsdConstructor:
         # Pre-define materials to avoid hitting the 64K PhysX material limit in large batched scenes.
         # By using the same config object, Isaac Lab's spawner will reuse the material prim if it's already created.
         black_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
-        grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3))
+        grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=(0.2, 0.2, 0.2),
+            metallic=1.0,
+            roughness=0.2,
+        )
         dark_grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
         ee_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.15, 0.15, 0.15))
         red_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2))
@@ -557,17 +561,17 @@ class LynxUsdConstructor:
         # Joint parameters from LynxRobotics
         joint_params = [
             # Joint 1
-            {"l0": 0.036, "r0": 0.058, "l1": 0.128, "r1": 0.062, "l2": 0.013, "r2": 0.062},
+            {"l0": 0.036, "r0": 0.0425, "l1": 0.128, "r1": 0.062, "l2": 0.013, "r2": 0.062},
             # Joint 2
-            {"l0": 0.036, "r0": 0.058, "l1": 0.128, "r1": 0.062, "l2": 0.013, "r2": 0.062},
+            {"l0": 0.036, "r0": 0.0425, "l1": 0.128, "r1": 0.062, "l2": 0.013, "r2": 0.062},
             # Joint 3
-            {"l0": 0.029, "r0": 0.04, "l1": 0.092, "r1": 0.042, "l2": 0.008, "r2": 0.042},
+            {"l0": 0.029, "r0": 0.031, "l1": 0.092, "r1": 0.042, "l2": 0.008, "r2": 0.042},
             # Joint 4
-            {"l0": 0.029, "r0": 0.04, "l1": 0.092, "r1": 0.042, "l2": 0.008, "r2": 0.042},
+            {"l0": 0.029, "r0": 0.031, "l1": 0.092, "r1": 0.042, "l2": 0.008, "r2": 0.042},
             # Joint 5
-            {"l0": 0.029, "r0": 0.04, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
+            {"l0": 0.029, "r0": 0.031, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
             # Joint 6
-            {"l0": 0.029, "r0": 0.04, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
+            {"l0": 0.029, "r0": 0.031, "l1": 0.096, "r1": 0.042, "l2": 0.008, "r2": 0.042},
         ]
 
         joint_limits_deg = [

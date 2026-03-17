@@ -19,7 +19,7 @@ from isaaclab_tasks.manager_based.manipulation.push.push_env_cfg import PushEnvC
 ##
 # Pre-defined configs
 ##
-from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
+from isaaclab.markers.config import FRAME_MARKER_CFG, RED_ARROW_X_MARKER_CFG, BLUE_ARROW_X_MARKER_CFG  # isort: skip
 from isaaclab_assets.robots.lynx_constructor import LynxRobotCfg, LynxUsdConstructor  # isort: skip
 
 
@@ -91,6 +91,7 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
             asset_name="robot",
             joint_names=["joint_[1-6]"],
             scale=0.1745,  # 10 degrees in radians
+            clip={".*": (-1.0, 1.0)},
         )
 
         # Set Cube as the object to push
@@ -98,11 +99,11 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         self.scene.object = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Object",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.3, 0.0, 0.07],
+                pos=[0.3, 0.0, 0.1],
                 rot=[1, 0, 0, 0],
             ),
             spawn=CuboidCfg(
-                size=(0.1, 0.1, 0.1),
+                size=(0.15, 0.15, 0.15),
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=4,
                     solver_velocity_iteration_count=0,
@@ -122,11 +123,11 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         self.scene.target = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Target",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.3, 0.0, 0.05],
+                pos=[0.3, 0.0, 0.075],
                 rot=[1, 0, 0, 0],
             ),
             spawn=CuboidCfg(
-                size=(0.1, 0.1, 0.1),
+                size=(0.15, 0.15, 0.15),
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=1,
                     solver_velocity_iteration_count=0,
@@ -200,3 +201,32 @@ class LynxCubePushEnvCfg_PLAY(LynxCubePushEnvCfg):
         self.scene.env_spacing = 2.5
         # disable randomization for play
         self.observations.policy.enable_corruption = False
+
+        # # Add orientation visualizer for play
+        # from isaaclab.markers import VisualizationMarkersCfg
+        # from isaaclab.managers import SceneEntityCfg
+        # import isaaclab.sim as sim_utils
+        # import copy
+
+        # # Define the visualizer config
+        # visualizer_cfg = VisualizationMarkersCfg(
+        #     prim_path="{ENV_REGEX_NS}/Visuals/OrientationVisualizer",
+        #     markers={
+        #         "object": copy.copy(RED_ARROW_X_MARKER_CFG.markers["arrow"]),
+        #         "target": copy.copy(BLUE_ARROW_X_MARKER_CFG.markers["arrow"]),
+        #     },
+        # )
+        # # Adjust scale of arrows
+        # visualizer_cfg.markers["object"].scale = (0.2, 0.02, 0.02)  # type: ignore
+        # visualizer_cfg.markers["target"].scale = (0.2, 0.02, 0.02)  # type: ignore
+
+        # # Add visualization term to observations
+        # from isaaclab.managers import ObservationTermCfg as ObsTerm
+        # self.observations.policy.object_orientation_vis = ObsTerm(  # type: ignore
+        #     func=mdp.visualize_object_orientation,
+        #     params={
+        #         "object_cfg": SceneEntityCfg("object"),
+        #         "target_cfg": SceneEntityCfg("target"),
+        #         "visualizer_cfg": visualizer_cfg,
+        #     },
+        # )

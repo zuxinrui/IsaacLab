@@ -7,13 +7,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import torch
 
-from isaaclab.assets import RigidObject
+from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import FrameTransformer
+from isaaclab.markers import VisualizationMarkers
 from isaaclab.utils.math import subtract_frame_transforms
 
 if TYPE_CHECKING:
@@ -110,3 +111,44 @@ def target_orientation_in_world_frame(
     """The orientation of the target as a quaternion (w, x, y, z) in the world frame."""
     target: RigidObject = env.scene[target_cfg.name]
     return target.data.root_quat_w
+
+
+def visualize_object_orientation(
+    env: ManagerBasedRLEnv,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    target_cfg: SceneEntityCfg = SceneEntityCfg("target"),
+    visualizer_cfg: Any | None = None,
+) -> torch.Tensor:
+    """Visualize the orientation of the object and target using arrows."""
+    if not hasattr(env, "_object_orientation_visualizer"):
+        if visualizer_cfg is not None:
+            from isaaclab.markers import VisualizationMarkers
+            import copy
+            # Resolve the prim path by replacing the regex namespace with env_0
+            resolved_cfg = copy.copy(visualizer_cfg)
+            resolved_cfg.prim_path = resolved_cfg.prim_path.format(ENV_REGEX_NS="/World/envs/env_0")
+            env._object_orientation_visualizer = VisualizationMarkers(resolved_cfg)  # type: ignore
+        else:
+            return torch.empty((env.num_envs, 0), device=env.device)
+
+    visualizer: Any = env._object_orientation_visualizer  # type: ignore
+    object: RigidObject = env.scene[object_cfg.name]
+    target: RigidObject = env.scene[target_cfg.name]
+
+    # Get positions and orientations
+    obj_pos = object.data.root_pos_w[:, :3]
+    obj_quat = object.data.root_quat_w
+    tar_pos = target.data.root_pos_w[:, :3]
+    tar_quat = target.data.root_quat_w
+
+    # Update visualizer
+    # We use two markers: 0 for object, 1 for target
+    # The visualizer expects (M, 3) where M is total number of markers across all envs
+    marker_indices = torch.tensor([0, 1], device=obj_pos.device, dtype=torch.int32).repeat(env.num_envs)
+    visualizer.visualize(
+        translations=torch.stack([obj_pos, tar_pos], dim=1).view(-1, 3),
+        orientations=torch.stack([obj_quat, tar_quat], dim=1).view(-1, 4),
+        marker_indices=marker_indices,
+    )
+
+    return torch.empty((env.num_envs, 0), device=env.device)

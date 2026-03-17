@@ -14,6 +14,7 @@ from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
+from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -149,24 +150,25 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
 
-        # Robot state
+        # Robot state [6]
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         # joint_vel = ObsTerm(func=mdp.joint_vel_rel)
 
-        # End-effector state
+        # End-effector pos [3]
         ee_pos = ObsTerm(
             func=mdp.ee_position_in_robot_root_frame,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "ee_frame_cfg": SceneEntityCfg("robot", body_names="ee"),
+                "ee_frame_cfg": SceneEntityCfg("ee_frame"),
             },
         )
+        # End-effector orientation [4]
         # ee_quat = ObsTerm(
         #     func=mdp.ee_orientation_in_world_frame,
         #     params={"ee_frame_cfg": SceneEntityCfg("robot", body_names="ee")},
         # )
 
-        # Object (cube) state
+        # Object (cube) pos [3]
         object_pos = ObsTerm(
             func=mdp.object_position_in_robot_root_frame,
             params={
@@ -174,12 +176,13 @@ class ObservationsCfg:
                 "object_cfg": SceneEntityCfg("object"),
             },
         )
+        # Object (cube) orientation [4]
         object_quat = ObsTerm(
             func=mdp.object_orientation_in_world_frame,
             params={"object_cfg": SceneEntityCfg("object")},
         )
 
-        # Target state
+        # Target state pos [3]
         target_pos = ObsTerm(
             func=mdp.target_position_in_robot_root_frame,
             params={
@@ -187,19 +190,22 @@ class ObservationsCfg:
                 "target_cfg": SceneEntityCfg("target"),
             },
         )
+        # Target state orientation [4]
         target_quat = ObsTerm(
             func=mdp.target_orientation_in_world_frame,
             params={"target_cfg": SceneEntityCfg("target")},
         )
 
         # Relative positions
+        # ee to object [3]
         ee_to_object = ObsTerm(
             func=mdp.ee_to_object_position,
             params={
                 "object_cfg": SceneEntityCfg("object"),
-                "ee_frame_cfg": SceneEntityCfg("robot", body_names="ee"),
+                "ee_frame_cfg": SceneEntityCfg("ee_frame"),
             },
         )
+        # object to target [3]
         object_to_target = ObsTerm(
             func=mdp.object_to_target_position,
             params={
@@ -208,8 +214,8 @@ class ObservationsCfg:
             },
         )
 
-        # Last action
-        actions = ObsTerm(func=mdp.last_action)
+        # Last action [6]
+        # actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -276,7 +282,7 @@ class RewardsCfg:
         params={
             "std": 0.1,
             "object_cfg": SceneEntityCfg("object"),
-            "ee_frame_cfg": SceneEntityCfg("robot", body_names="ee"),
+            "ee_frame_cfg": SceneEntityCfg("ee_frame"),
         },
         weight=2.0,
     )
@@ -334,7 +340,7 @@ class PushGoalRewardsCfg:
         func=mdp.object_ee_distance_raw,
         params={
             "object_cfg": SceneEntityCfg("object"),
-            "ee_frame_cfg": SceneEntityCfg("robot", body_names="ee"),
+            "ee_frame_cfg": SceneEntityCfg("ee_frame"),
         },
         weight=-0.2,
     )
@@ -345,7 +351,7 @@ class PushGoalRewardsCfg:
         params={
             "std": 0.05,
             "object_cfg": SceneEntityCfg("object"),
-            "ee_frame_cfg": SceneEntityCfg("robot", body_names="ee"),
+            "ee_frame_cfg": SceneEntityCfg("ee_frame"),
         },
         weight=0.1,
     )
