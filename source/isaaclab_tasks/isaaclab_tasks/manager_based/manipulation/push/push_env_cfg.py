@@ -396,7 +396,7 @@ class PushGoalRewardsCfg:
             "object_cfg": SceneEntityCfg("object"),
             "target_cfg": SceneEntityCfg("target"),
         },
-        weight=10.0,
+        weight=20.0,
     )
 
     # 7. Undesired robot contacts penalty
@@ -428,6 +428,17 @@ class TerminationsCfg:
     #         "object_cfg": SceneEntityCfg("object"),
     #     },
     # )
+
+    # terminate if the cube reaches the target (success)
+    success = DoneTerm(
+        func=mdp.object_reached_goal,
+        params={
+            "pos_threshold": 0.03,
+            "ori_threshold": 0.1745,
+            "object_cfg": SceneEntityCfg("object"),
+            "target_cfg": SceneEntityCfg("target"),
+        },
+    )
 
 
 @configclass

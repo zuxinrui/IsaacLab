@@ -112,6 +112,61 @@ def undesired_robot_contacts(
     return undesired_contact_mask.float()
 
 
+def undesired_robot_contacts_excluding_self(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    ee_link_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names="ee_cylinder"),
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces"),
+) -> torch.Tensor:
+    """Penalize contacts between the robot (excluding the end-effector) and any other object,
+    excluding self-collisions between the robot's own segments.
+
+    This function uses the `net_forces_w_with_filter` attribute of the `ContactSensor` data,
+    which contains the net contact forces filtered by the sensor's `filter_prim_paths_expr`.
+    To exclude self-collisions, the `filter_prim_paths_expr` in the sensor configuration
+    should be set to exclude the robot's own prims (e.g., by using a negative lookahead or
+    by explicitly listing other objects).
+
+    Args:
+        env: The environment.
+        threshold: The contact force threshold to consider a contact.
+        object_cfg: The object configuration (not used in this version). Defaults to SceneEntityCfg("object").
+        robot_cfg: The robot configuration. Defaults to SceneEntityCfg("robot").
+        ee_link_cfg: The end-effector link configuration. Defaults to SceneEntityCfg("robot", body_names="ee").
+        sensor_cfg: The contact sensor configuration. Defaults to SceneEntityCfg("contact_forces").
+
+    Returns:
+        Penalty tensor of shape (num_envs,).
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+
+    # Get the indices of the bodies to exclude (end-effector)
+    ee_link_indices = ee_link_cfg.body_ids
+
+    # Use net_forces_w_with_filter if available, otherwise fall back to net_forces_w
+    # net_forces_w_with_filter contains forces from contacts with bodies matching the filter expression
+    if hasattr(contact_sensor.data, "net_forces_w_with_filter"):
+        contact_forces = contact_sensor.data.net_forces_w_with_filter
+    else:
+        contact_forces = contact_sensor.data.net_forces_w
+
+    if contact_forces is None or contact_forces.numel() == 0:
+        return torch.zeros(env.num_envs, device=contact_sensor.device)
+
+    num_bodies = contact_forces.shape[1]
+    mask = torch.ones(num_bodies, dtype=torch.bool, device=contact_sensor.device)
+    mask[ee_link_indices] = False
+
+    # Sum the contact force magnitudes for all other bodies
+    non_ee_contact_forces = contact_forces[:, mask, :]
+    non_ee_contact_mag = torch.norm(non_ee_contact_forces, dim=-1).max(dim=-1)[0]
+    undesired_contact_mask = non_ee_contact_mag > threshold
+
+    return undesired_contact_mask.float()
+
+
 def object_goal_distance(
     env: ManagerBasedRLEnv,
     std: float,

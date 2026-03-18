@@ -75,7 +75,9 @@ class LynxRobotCfg(ArticulationCfg):
     
     # Physics/Actuation
     joint_position_limit_deg: float = 180.0
-    joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s
+    # joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s
+    # 100 deg / s:
+    joint_velocity_limit_rad_s: float = 1.7453292519943295  # 100 deg/s
     joint_acceleration_limit_rad_s2: float = 1.7453292519943295  # 100 deg/s^2
 
     # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.
@@ -84,21 +86,21 @@ class LynxRobotCfg(ArticulationCfg):
         "lynx_arm_mega": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-2]"],
             effort_limit_sim=130.0,
-            velocity_limit_sim=0.3490658503988659,
+            velocity_limit_sim=joint_velocity_limit_rad_s,
             stiffness=800.0,
             damping=40.0,
         ),
         "lynx_arm_standard": ImplicitActuatorCfg(
             joint_names_expr=["joint_[3-4]"],
             effort_limit_sim=54.0,
-            velocity_limit_sim=0.3490658503988659,
+            velocity_limit_sim=joint_velocity_limit_rad_s,
             stiffness=800.0,
             damping=40.0,
         ),
         "lynx_arm_lite": ImplicitActuatorCfg(
             joint_names_expr=["joint_[5-6]"],
             effort_limit_sim=19.0,
-            velocity_limit_sim=0.3490658503988659,
+            velocity_limit_sim=joint_velocity_limit_rad_s,
             stiffness=800.0,
             damping=40.0,
         ),
@@ -443,7 +445,7 @@ class LynxUsdConstructor:
                     "inertia": (2.053456e-03, 3.997604e-04, 2.077309e-03)
                 },
                 {
-                    "mass": 6.0,
+                    "mass": 4.5,
                     "com": (0.092725, 0.145334, 0.000038),
                     "inertia": (5.3897178e-03, 1.3406068e-03, 5.9820744e-03)
                 },
@@ -720,7 +722,7 @@ class LynxUsdConstructor:
                     center_of_mass=(0.0, 0.0, approx_length / 2.0),
                 )
                 curr_parent_path = tube_path
-                curr_pos = actual_end_pos
+                curr_pos = end_pos  # end_pos / actual_end_pos
                 curr_quat = last_seg_quat
                 
                 tube_idx += 1
@@ -842,14 +844,9 @@ class LynxUsdConstructor:
                 )
                 
                 # Update curr for next iteration.
-                # The next joint's attachment point is at the tip of cylinder2, expressed in
-                # the current child body's local frame (= world frame).
+                # Remember: curr_pos / curr_quat are the rel to the "origin" of this body!
                 curr_parent_path = link_path
                 curr_pos = cylinder2_pos + new_relative_quat.Transform(Gf.Vec3f(0, 0, p["l2"] / 2))
-                # FIX: Propagate the joint frame orientation so the next joint's axis is
-                # expressed correctly in the next parent body's local frame.
-                # For inline joints the child body's "output" frame has the same orientation
-                # as new_relative_quat (the joint frame rotated by rx*twist).
                 curr_quat = new_relative_quat
 
                 # Apply Pro Arm 900 physical parameters
@@ -884,8 +881,9 @@ class LynxUsdConstructor:
                 )
 
                 # Parent-frame joint axis frame and parent-side fixed-geometry poses.
-                fixed_cylinder0_pos_parent = curr_pos + curr_quat.Transform(cylinder0_pos - joint_pos_rel)
-                fixed_cylinder0_add_pos_parent = curr_pos + curr_quat.Transform(cylinder0_add_pos - joint_pos_rel)
+                fixed_cylinder0_pos_parent = curr_pos + curr_quat.Transform(cylinder0_pos)
+                fixed_cylinder0_add_pos_parent = curr_pos + curr_quat.Transform(cylinder0_add_pos)
+                cylinder1_pos_parent = curr_pos + curr_quat.Transform(joint_pos_rel)
                 # Uniform module shift in world-up. Applying exactly the same shift to fixed,
                 # joint anchors, moving part, and next curr_pos preserves relative geometry.
                 # IMPORTANT: avoid cumulative over-shift only for truly consecutive
@@ -903,7 +901,7 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=black_material
                     ),
-                    translation=tuple(fixed_cylinder0_pos_parent + orth_module_shift),
+                    translation=tuple(fixed_cylinder0_pos_parent),
                     orientation=self._quat_to_tuple(curr_quat)
                 )
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
@@ -915,7 +913,7 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=black_material
                     ),
-                    translation=tuple(fixed_cylinder0_add_pos_parent + orth_module_shift),
+                    translation=tuple(fixed_cylinder0_add_pos_parent),
                     orientation=self._quat_to_tuple(curr_quat)
                 )
                 
@@ -929,7 +927,7 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=black_material
                     ),
-                    translation=tuple(curr_pos + orth_module_shift),
+                    translation=tuple(cylinder1_pos_parent),
                     orientation=self._quat_to_tuple(orth_axis_frame_parent)
                 )
                 
@@ -944,16 +942,21 @@ class LynxUsdConstructor:
                 # This reverses the positive rotation direction.
                 flip_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(1, 0, 0), 180).GetQuat())
                 
-                joint.CreateLocalPos0Attr().Set(curr_pos + orth_module_shift)
+                # Notive: the father joint is actually the previous joint!
+                # So here the "curr_pos" is the rel pos to the father joint origin (which is the grandfather's attachment point),
+                # and the "joint_pos_rel" is the offset from cylinder0/1 (with direction because of the curved tube/joint).
+                joint.CreateLocalPos0Attr().Set(curr_pos + curr_quat.Transform(joint_pos_rel))
                 joint.CreateLocalRot0Attr().Set(orth_axis_frame_parent * flip_quat)
-                # Place the hinge at the center of fixed_visual_shell.
-                joint.CreateLocalPos1Attr().Set(joint_pos_rel + orth_module_shift)
+                joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0, 0, 0))  # Gf.Vec3f(0, 0, 0) / joint_pos_rel?
                 joint.CreateLocalRot1Attr().Set(new_relative_quat * flip_quat)
                 joint.CreateCollisionEnabledAttr(False)
                 self._set_joint_limits(joint, *joint_limits_deg[i])
                 sim_utils.safe_set_attribute_on_usd_prim(stage.GetPrimAtPath(joint_path), "physics:jointEnabled", True, camel_case=True)
                 
                 # Moving part visual
+                cylinder2_pos_rel_to_joint = new_relative_quat.Transform(
+                    Gf.Vec3f(0, 0, l1 / 2 + l2_orig / 2)
+                )
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
                     f"{link_path}/moving_visual",
                     sim_utils.spawners.MeshCylinderCfg(
@@ -963,7 +966,7 @@ class LynxUsdConstructor:
                         physics_material=shared_physics_material,
                         visual_material=grey_material
                     ),
-                    translation=tuple(cylinder2_pos_rel + orth_module_shift),
+                    translation=tuple(cylinder2_pos_rel_to_joint),
                     # Keep the moving visual aligned with the same joint frame used for the
                     # orthogonal revolute axis, matching MuJoCo behavior.
                     orientation=self._quat_to_tuple(new_relative_quat)
@@ -971,11 +974,9 @@ class LynxUsdConstructor:
                 
                 # Update curr for next iteration.
                 curr_parent_path = link_path
-                curr_pos = cylinder2_pos_rel + orth_module_shift + new_relative_quat.Transform(
-                    Gf.Vec3f(0, 0, l2_orig / 2)
-                )
-                # Propagate the orthogonal joint-frame orientation so next joints are expressed
-                # in the same accumulated frame convention as MuJoCo.
+
+                # notice that the current body is "the moving part", so the rel pos is from here:
+                curr_pos = cylinder2_pos_rel_to_joint + new_relative_quat.Transform(Gf.Vec3f(0, 0, l2_orig / 2))
                 curr_quat = new_relative_quat
 
                 # Apply Pro Arm 900 physical parameters
