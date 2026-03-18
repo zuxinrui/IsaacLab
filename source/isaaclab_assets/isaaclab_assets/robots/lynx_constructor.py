@@ -415,7 +415,7 @@ class LynxUsdConstructor:
         # By using the same config object, Isaac Lab's spawner will reuse the material prim if it's already created.
         black_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 0.0))
         grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
-            diffuse_color=(0.2, 0.2, 0.2),
+            diffuse_color=(0.25, 0.25, 0.25),
             metallic=1.0,
             roughness=0.2,
         )
