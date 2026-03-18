@@ -27,6 +27,20 @@ def _make_lynx_robot_cfg() -> LynxRobotCfg:
     """Create and configure the Lynx robot configuration."""
     robot_cfg = LynxRobotCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
+        num_joints=6,
+        genotype_tube=[0, 1, 0, 1, 0],
+        genotype_joints=1,
+        rotation_angles=[180.0, 0.0, 0.0, -180.0, 0.0, 0.0],
+        l1_end_point_pos=(0.0, 0.0, 0.2),
+        l1_end_point_theta=0.0,
+        l2_end_point_pos=(0.0, 0.0, 0.2805),
+        l2_end_point_theta=0.0,
+        l3_end_point_pos=(0.0, 0.0, 0.2),
+        l3_end_point_theta=0.0,
+        l4_end_point_pos=(0.0, 0.0, 0.2805),
+        l4_end_point_theta=0.0,
+        l5_end_point_pos=(0.0, 0.0, 0.2),
+        l5_end_point_theta=0.0,
     )
     # Performance: reduce procedural tube tessellation to lower USD prim count,
     # collision complexity and broadphase pressure in large batched scenes.
@@ -99,7 +113,7 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         self.scene.object = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Object",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.3, 0.0, 0.1],
+                pos=[0.3, 0.0, 0.09],
                 rot=[1, 0, 0, 0],
             ),
             spawn=CuboidCfg(

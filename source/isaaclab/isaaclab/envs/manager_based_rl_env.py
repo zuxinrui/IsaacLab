@@ -206,6 +206,9 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         self.reset_time_outs = self.termination_manager.time_outs
         # -- reward computation
         self.reward_buf = self.reward_manager.compute(dt=self.step_dt)
+        # expose per-step reward terms for SAC-X-style downstream consumption
+        self.extras["sacx/reward_terms"] = self.reward_manager.step_reward_contributions
+        self.extras["sacx/reward_term_names"] = self.reward_manager.active_terms
 
         if len(self.recorder_manager.active_terms) > 0:
             # update observations for recording if needed

@@ -64,6 +64,11 @@ class RewardManager(ManagerBase):
 
         # Buffer which stores the current step reward for each term for each environment
         self._step_reward = torch.zeros((self.num_envs, len(self._term_names)), dtype=torch.float, device=self.device)
+        # Buffer which stores weighted per-step reward contributions for each term for each environment.
+        # This is the per-term quantity that sums to the scalar reward returned by `compute`.
+        self._step_reward_contributions = torch.zeros(
+            (self.num_envs, len(self._term_names)), dtype=torch.float, device=self.device
+        )
 
     def __str__(self) -> str:
         """Returns: A string representation for reward manager."""
@@ -93,6 +98,14 @@ class RewardManager(ManagerBase):
     def active_terms(self) -> list[str]:
         """Name of active reward terms."""
         return self._term_names
+
+    @property
+    def step_reward_contributions(self) -> torch.Tensor:
+        """Weighted per-step reward contributions for each term.
+
+        Shape is ``(num_envs, num_terms)`` and the columns follow :attr:`active_terms` ordering.
+        """
+        return self._step_reward_contributions
 
     """
     Operations.
@@ -145,6 +158,7 @@ class RewardManager(ManagerBase):
             # skip if weight is zero (kind of a micro-optimization)
             if term_cfg.weight == 0.0:
                 self._step_reward[:, term_idx] = 0.0
+                self._step_reward_contributions[:, term_idx] = 0.0
                 continue
             # compute term's value
             value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight * dt
@@ -155,6 +169,7 @@ class RewardManager(ManagerBase):
 
             # Update current reward for this step.
             self._step_reward[:, term_idx] = value / dt
+            self._step_reward_contributions[:, term_idx] = value
 
         return self._reward_buf
 
