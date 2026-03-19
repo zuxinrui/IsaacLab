@@ -15,6 +15,9 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcem
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-v2 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Open-Drawer-Franka-v0 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --distributed --headless --num_envs 16384
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-ObsDelay-v0 --distributed --headless --num_envs 16384
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v0 --distributed --headless --num_envs 8192
+
 
 
 # also works for 4070 ti super (16GB VRAM), the observation excludes joint velocities:
@@ -31,10 +34,13 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Mu
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Lift-Cube-Franka-v0 --num_envs 16384 --headless
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --num_envs 1024
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --num_envs 32 --headless
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-ObsDelay-v0 --num_envs 32 --headless  # Isaac-Push-Cube-Lynx-ObsDelay-v0 | Isaac-Push-Cube-Lynx-v0
 
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Trapezoidal-v0 --num_envs 1024 --headless
+
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v0 --headless --num_envs 32
+python scripts/reinforcement_learning/skrl/train_sacx.py --task Isaac-Ball-In-Cup-Lynx-v0 --num_envs 1024 --total_steps 200000 --headless
 
 
 # play the trained model:
@@ -54,4 +60,8 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-Play-v0 --num_envs 32 --headless --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-15_01-25-19 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-15_01-25-19/model_1499.pt
 
 # Interactive debug command (GUI, fewer envs for smooth viewport):
-python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-Play-v0 --num_envs 8 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-17_15-56-59 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-17_15-56-59/model_1499.pt
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-Play-v0 --num_envs 8 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-18_23-07-04 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-18_23-07-04/model_1499.pt
+
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v0 --num_envs 8
+
+

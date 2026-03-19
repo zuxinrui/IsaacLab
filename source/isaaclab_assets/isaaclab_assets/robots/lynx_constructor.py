@@ -75,9 +75,9 @@ class LynxRobotCfg(ArticulationCfg):
     
     # Physics/Actuation
     joint_position_limit_deg: float = 180.0
-    # joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s
+    # joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s  1.7453292519943295 100 deg/s  50 deg/s: 0.8726646259971648
     # 100 deg / s:
-    joint_velocity_limit_rad_s: float = 1.7453292519943295  # 100 deg/s
+    joint_velocity_limit_rad_s: float = 0.3490658503988659  # 100 deg/s / 20 deg/s  / 50 deg/s
     joint_acceleration_limit_rad_s2: float = 1.7453292519943295  # 100 deg/s^2
 
     # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.
@@ -109,10 +109,10 @@ class LynxRobotCfg(ArticulationCfg):
     init_state: ArticulationCfg.InitialStateCfg = ArticulationCfg.InitialStateCfg(
         joint_pos={
             "joint_1": 0.0,
-            "joint_2": -0.45,
-            "joint_3": 0.9,
+            "joint_2": 0.0,
+            "joint_3": 0.0,
             "joint_4": 0.0,
-            "joint_5": 0.6,
+            "joint_5": 0.0,
             "joint_6": 0.0,
         },
     )

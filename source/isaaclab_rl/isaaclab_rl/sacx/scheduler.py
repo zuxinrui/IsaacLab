@@ -1,41 +1,44 @@
-# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
-"""Minimal SAC-X intention scheduler(s).
-
-This module intentionally provides only a tiny baseline scheduler implementation.
-"""
-
-from __future__ import annotations
-
 import torch
+import numpy as np
 
-
-class UniformIntentionScheduler:
-    """Uniform random intention scheduler.
-
-    This is a skeleton scheduler that samples intentions independently and
-    uniformly from ``[0, num_tasks)``.
+class SACXScheduler:
+    """Scheduler for SAC-X that decides which intention to execute.
+    
+    Supports uniform random sampling and segment-based switching.
     """
+    def __init__(self, num_envs: int, num_tasks: int, segment_length: int = 32, device: str = "cuda"):
+        self.num_envs = num_envs
+        self.num_tasks = num_tasks
+        self.segment_length = segment_length
+        self.device = device
+        
+        # Current intention for each environment
+        self.current_z = torch.randint(0, num_tasks, (num_envs,), device=device)
+        # Steps since last switch for each environment
+        self.steps_count = torch.zeros(num_envs, dtype=torch.long, device=device)
 
-    def __init__(self, num_tasks: int, device: str | torch.device = "cpu"):
-        if num_tasks <= 0:
-            raise ValueError(f"num_tasks must be > 0, got {num_tasks}")
-        self.num_tasks = int(num_tasks)
-        self.device = torch.device(device)
+    def sample(self) -> torch.Tensor:
+        """Returns the current intention for each environment."""
+        return self.current_z
 
-    def sample(self, batch_size: int, device: str | torch.device | None = None) -> torch.Tensor:
-        """Sample task IDs.
-
-        Args:
-            batch_size: Number of IDs to sample.
-            device: Optional output device override.
-
-        Returns:
-            Tensor of shape ``(batch_size,)`` with dtype ``torch.long``.
+    def update(self, dones: torch.Tensor):
+        """Updates the scheduler state.
+        
+        Switches intention if segment length is reached or if environment is reset.
         """
-        out_device = torch.device(device) if device is not None else self.device
-        return torch.randint(0, self.num_tasks, (batch_size,), dtype=torch.long, device=out_device)
-
+        self.steps_count += 1
+        
+        # Switch if segment length reached OR environment reset
+        # Ensure dones is a 1D tensor
+        if dones.dim() > 1:
+            dones = dones.squeeze(-1)
+            
+        switch_mask = (self.steps_count >= self.segment_length) | dones.bool()
+        
+        if switch_mask.any():
+            num_switches = int(switch_mask.sum().item())
+            new_z = torch.randint(0, self.num_tasks, (num_switches,), device=self.device)
+            self.current_z[switch_mask] = new_z
+            self.steps_count[switch_mask] = 0
+            
+        return self.current_z

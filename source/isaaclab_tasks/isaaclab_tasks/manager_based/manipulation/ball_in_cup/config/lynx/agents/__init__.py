@@ -3,7 +3,5 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Manipulation environments for fixed-arm robots."""
+from . import rsl_rl_ppo_cfg
 
-from .ball_in_cup import *  # noqa
-from .reach import *  # noqa

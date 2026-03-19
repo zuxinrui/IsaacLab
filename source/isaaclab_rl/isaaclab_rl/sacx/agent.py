@@ -1,139 +1,161 @@
-# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
-"""Minimal SAC-X agent update logic.
-
-The implementation is intentionally skeleton-level and kept compact.
-"""
-
-from __future__ import annotations
-
 import torch
-import torch.nn.functional as F
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+from typing import Dict, List, Any, Optional
 
-from .models import SACXModels
+class MLP(nn.Module):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dims: List[int] = [256, 256]):
+        super().__init__()
+        layers = []
+        curr_dim = input_dim
+        for h in hidden_dims:
+            layers.append(nn.Linear(curr_dim, h))
+            layers.append(nn.ReLU())
+            curr_dim = h
+        layers.append(nn.Linear(curr_dim, output_dim))
+        self.net = nn.Sequential(*layers)
 
+    def forward(self, x):
+        return self.net(x)
 
 class SACXAgent:
-    """Minimal SAC-X update routines.
-
-    Provided routines:
-    - selected-task critic update (for one sampled intention)
-    - shared actor update (task-conditioned actor)
+    """SAC-X Agent with multi-critic and task-conditioned actor.
+    
+    This implementation uses a shared actor trunk and multiple critic heads.
     """
-
-    def __init__(
-        self,
-        models: SACXModels,
-        device: str | torch.device,
-        gamma: float = 0.99,
-        tau: float = 0.005,
-        actor_lr: float = 3e-4,
-        critic_lr: float = 3e-4,
-        alpha: float = 0.2,
-    ):
-        self.models = models
-        self.device = torch.device(device)
+    def __init__(self, obs_dim: int, action_dim: int, num_tasks: int, 
+                 lr: float = 3e-4, gamma: float = 0.99, tau: float = 0.005, 
+                 device: str = "cuda"):
+        self.obs_dim = obs_dim
+        self.action_dim = action_dim
+        self.num_tasks = num_tasks
+        self.device = device
         self.gamma = gamma
         self.tau = tau
-        self.alpha = alpha
+        
+        # Actor: pi(a | s, z)
+        # Input: obs + task_one_hot
+        self.actor = MLP(obs_dim + num_tasks, action_dim * 2).to(device)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
+        
+        # Critics: Q_k(s, a) for each task k
+        # We use 2 critics per task for clipped double-Q learning
+        self.critics_1 = nn.ModuleList([MLP(obs_dim + action_dim, 1) for _ in range(num_tasks)]).to(device)
+        self.critics_2 = nn.ModuleList([MLP(obs_dim + action_dim, 1) for _ in range(num_tasks)]).to(device)
+        
+        self.target_critics_1 = nn.ModuleList([MLP(obs_dim + action_dim, 1) for _ in range(num_tasks)]).to(device)
+        self.target_critics_2 = nn.ModuleList([MLP(obs_dim + action_dim, 1) for _ in range(num_tasks)]).to(device)
+        
+        for i in range(num_tasks):
+            self.target_critics_1[i].load_state_dict(self.critics_1[i].state_dict())
+            self.target_critics_2[i].load_state_dict(self.critics_2[i].state_dict())
+            
+        self.critic_optimizer = optim.Adam(list(self.critics_1.parameters()) + list(self.critics_2.parameters()), lr=lr)
+        
+        # Entropy temperature
+        self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
+        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=lr)
+        self.target_entropy = -action_dim
 
-        self.models.to(self.device)
+    def get_action(self, obs: torch.Tensor, z: torch.Tensor, sample: bool = True):
+        # z is (num_envs,)
+        z_one_hot = torch.nn.functional.one_hot(z, num_classes=self.num_tasks).float()
+        actor_input = torch.cat([obs, z_one_hot], dim=-1)
+        
+        mu_logstd = self.actor(actor_input)
+        mu, log_std = mu_logstd.chunk(2, dim=-1)
+        log_std = torch.clamp(log_std, -20, 2)
+        std = log_std.exp()
+        
+        dist = torch.distributions.Normal(mu, std)
+        if sample:
+            u = dist.rsample()
+        else:
+            u = mu
+            
+        action = torch.tanh(u)
+        
+        # Log prob for entropy
+        log_prob = dist.log_prob(u) - torch.log(1 - action.pow(2) + 1e-6)
+        log_prob = log_prob.sum(-1, keepdim=True)
+        
+        return action, log_prob
 
-        self.actor_optimizer = torch.optim.Adam(self.models.actor.parameters(), lr=actor_lr)
-        self.critic_optimizers = [torch.optim.Adam(c.parameters(), lr=critic_lr) for c in self.models.critics]
-
-    @torch.no_grad()
-    def select_action(self, obs: torch.Tensor, task_ids: torch.Tensor, deterministic: bool = False) -> torch.Tensor:
-        return self.models.actor.act(obs, task_ids, deterministic=deterministic)
-
-    def _polyak_update(self, task_id: int):
-        critic = self.models.critics[task_id]
-        target = self.models.target_critics[task_id]
-        for target_p, p in zip(target.parameters(), critic.parameters(), strict=True):
-            target_p.data.mul_(1.0 - self.tau)
-            target_p.data.add_(self.tau * p.data)
-
-    def _min_q_by_task(self, obs: torch.Tensor, action: torch.Tensor, task_ids: torch.Tensor, *, target: bool) -> torch.Tensor:
-        values = torch.zeros((obs.shape[0], 1), device=obs.device)
-        critics = self.models.target_critics if target else self.models.critics
-        for t in range(self.models.num_tasks):
-            mask = task_ids == t
-            if torch.any(mask):
-                q1, q2 = critics[t](obs[mask], action[mask])
-                values[mask] = torch.minimum(q1, q2)
-        return values
-
-    def update_selected_task(
-        self,
-        batch: dict[str, torch.Tensor],
-        selected_task: int,
-        actor_task_ids: torch.Tensor | None = None,
-    ) -> dict[str, float]:
-        """Run one selected-task critic update + shared actor update.
-
-        Args:
-            batch: Sampled replay batch.
-            selected_task: Intention index used for critic target/reward selection.
-            actor_task_ids: Optional per-sample task IDs for actor update. If omitted,
-                uses sampled ``batch["task_id"]``.
-        """
-        obs = batch["obs"].to(self.device)
-        next_obs = batch["next_obs"].to(self.device)
-        action = batch["action"].to(self.device)
-        done = batch["done"].to(self.device).view(-1, 1)
-        reward_terms = batch["reward_terms"].to(self.device)
-        sample_task_ids = batch["task_id"].to(self.device).long().view(-1)
-
-        if selected_task < 0 or selected_task >= self.models.num_tasks:
-            raise ValueError(f"selected_task out of range: {selected_task}")
-        reward = reward_terms[:, selected_task].view(-1, 1)
-
-        # ---- selected-task critic update ----
-        critic = self.models.critics[selected_task]
-        target_critic = self.models.target_critics[selected_task]
-
+    def update(self, batch: Dict[str, torch.Tensor]):
+        obs = batch["obs"]
+        actions = batch["actions"]
+        next_obs = batch["next_obs"]
+        rewards = batch["rewards"] # (batch_size, num_tasks)
+        dones = batch["dones"]
+        z_exec = batch["z_exec"] # (batch_size, 1)
+        
+        batch_size = obs.shape[0]
+        
+        # 1. Update Critics
         with torch.no_grad():
-            next_task_ids = torch.full((next_obs.shape[0],), selected_task, dtype=torch.long, device=self.device)
-            next_action, next_log_prob = self.models.actor.sample(next_obs, next_task_ids)
-            target_q1, target_q2 = target_critic(next_obs, next_action)
-            target_min_q = torch.minimum(target_q1, target_q2) - self.alpha * next_log_prob
-            target_value = reward + (1.0 - done) * self.gamma * target_min_q
-
-        q1, q2 = critic(obs, action)
-        critic_loss = F.mse_loss(q1, target_value) + F.mse_loss(q2, target_value)
-
-        critic_optim = self.critic_optimizers[selected_task]
-        critic_optim.zero_grad(set_to_none=True)
+            # Sample next actions for all tasks (using current policy)
+            # For simplicity, we use the same next action for all task updates in this batch
+            next_z = torch.randint(0, self.num_tasks, (batch_size,), device=self.device)
+            next_actions, next_log_probs = self.get_action(next_obs, next_z)
+            
+            alpha = self.log_alpha.exp()
+            
+            target_q_values = []
+            for k in range(self.num_tasks):
+                q1_target = self.target_critics_1[k](torch.cat([next_obs, next_actions], dim=-1))
+                q2_target = self.target_critics_2[k](torch.cat([next_obs, next_actions], dim=-1))
+                q_target = torch.min(q1_target, q2_target) - alpha * next_log_probs
+                
+                # r_k is rewards[:, k]
+                target_q = rewards[:, k:k+1] + (1 - dones) * self.gamma * q_target
+                target_q_values.append(target_q)
+        
+        # Compute current Q values and loss for all tasks
+        critic_loss = torch.tensor(0.0, device=self.device)
+        for k in range(self.num_tasks):
+            q1 = self.critics_1[k](torch.cat([obs, actions], dim=-1))
+            q2 = self.critics_2[k](torch.cat([obs, actions], dim=-1))
+            critic_loss += torch.nn.functional.mse_loss(q1, target_q_values[k])
+            critic_loss += torch.nn.functional.mse_loss(q2, target_q_values[k])
+            
+        self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        critic_optim.step()
-
-        self._polyak_update(selected_task)
-
-        # ---- shared actor update ----
-        if actor_task_ids is None:
-            actor_task_ids = sample_task_ids
-        actor_task_ids = actor_task_ids.to(self.device).long().view(-1)
-
-        for c in self.models.critics:
-            c.requires_grad_(False)
-
-        pi_action, log_prob = self.models.actor.sample(obs, actor_task_ids)
-        min_q = self._min_q_by_task(obs, pi_action, actor_task_ids, target=False)
-        actor_loss = (self.alpha * log_prob - min_q).mean()
-
-        self.actor_optimizer.zero_grad(set_to_none=True)
+        self.critic_optimizer.step()
+        
+        # 2. Update Actor
+        # Randomly pick a task to optimize the actor for this batch
+        task_to_opt = np.random.randint(0, self.num_tasks)
+        
+        # Sample new actions
+        z_opt = torch.full((batch_size,), task_to_opt, dtype=torch.long, device=self.device)
+        new_actions, log_probs = self.get_action(obs, z_opt)
+        
+        q1_new = self.critics_1[task_to_opt](torch.cat([obs, new_actions], dim=-1))
+        q2_new = self.critics_2[task_to_opt](torch.cat([obs, new_actions], dim=-1))
+        q_new = torch.min(q1_new, q2_new)
+        
+        actor_loss = (alpha.detach() * log_probs - q_new).mean()
+        
+        self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
-
-        for c in self.models.critics:
-            c.requires_grad_(True)
-
+        
+        # 3. Update Alpha
+        alpha_loss = -(self.log_alpha * (log_probs + self.target_entropy).detach()).mean()
+        self.alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()
+        
+        # 4. Soft Update Targets
+        for k in range(self.num_tasks):
+            for param, target_param in zip(self.critics_1[k].parameters(), self.target_critics_1[k].parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+            for param, target_param in zip(self.critics_2[k].parameters(), self.target_critics_2[k].parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+                
         return {
-            "critic_loss": float(critic_loss.detach().cpu().item()),
-            "actor_loss": float(actor_loss.detach().cpu().item()),
-            "selected_task": float(selected_task),
+            "critic_loss": critic_loss.item(),
+            "actor_loss": actor_loss.item(),
+            "alpha": alpha.item()
         }
-

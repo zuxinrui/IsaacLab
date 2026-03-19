@@ -215,7 +215,7 @@ class ObservationsCfg:
         )
 
         # Last action [6]
-        # actions = ObsTerm(func=mdp.last_action)
+        actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -430,15 +430,15 @@ class TerminationsCfg:
     # )
 
     # terminate if the cube reaches the target (success)
-    success = DoneTerm(
-        func=mdp.object_reached_goal,
-        params={
-            "pos_threshold": 0.03,
-            "ori_threshold": 0.1745,
-            "object_cfg": SceneEntityCfg("object"),
-            "target_cfg": SceneEntityCfg("target"),
-        },
-    )
+    # success = DoneTerm(
+    #     func=mdp.object_reached_goal,
+    #     params={
+    #         "pos_threshold": 0.03,
+    #         "ori_threshold": 0.1745,
+    #         "object_cfg": SceneEntityCfg("object"),
+    #         "target_cfg": SceneEntityCfg("target"),
+    #     },
+    # )
 
 
 @configclass
@@ -486,8 +486,8 @@ class PushEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 12
         self.episode_length_s = 20.0
         # simulation settings
-        self.sim.dt = 0.016666666  # 100Hz
-        self.sim.render_interval = self.decimation
+        self.sim.dt = 1.0 / 60.0
+        self.sim.render_interval = 1
 
         self.sim.physx.bounce_threshold_velocity = 0.2
         self.sim.physx.bounce_threshold_velocity = 0.01

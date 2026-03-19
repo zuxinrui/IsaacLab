@@ -140,7 +140,7 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
         )
 
         # 2) Multi-segment String
-        num_segments = 20
+        num_segments = 12
         segment_length = self.cfg.string_length / num_segments
         segment_radius = self.cfg.string_radius
         segment_mass = 0.0005

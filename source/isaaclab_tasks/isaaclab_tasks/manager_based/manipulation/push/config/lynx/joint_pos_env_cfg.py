@@ -87,8 +87,8 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
 
         # Performance-oriented simulation setup for play/inference:
         # keep 5Hz control while reducing expensive physics sub-steps.
-        self.sim.dt = 1.0 / 60.0
-        self.decimation = 12
+        self.sim.dt = 1.0 / 30.0
+        self.decimation = 6
         self.sim.render_interval = 1
 
         # Relax global solver settings for throughput (sufficient for push task stability).

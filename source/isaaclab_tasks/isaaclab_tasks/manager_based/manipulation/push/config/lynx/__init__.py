@@ -36,3 +36,25 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+gym.register(
+    id="Isaac-Push-Cube-Lynx-ObsDelay-v0",
+    entry_point=f"{__name__}.obs_delay_env:LynxPushObsDelayEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obs_delay_env:LynxCubePushObsDelayEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PushCubePPORunnerCfg",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-Push-Cube-Lynx-ObsDelay-Play-v0",
+    entry_point=f"{__name__}.obs_delay_env:LynxPushObsDelayEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obs_delay_env:LynxCubePushObsDelayEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PushCubePPORunnerCfg",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+    disable_env_checker=True,
+)
