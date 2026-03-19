@@ -77,7 +77,7 @@ class LynxRobotCfg(ArticulationCfg):
     joint_position_limit_deg: float = 180.0
     # joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s  1.7453292519943295 100 deg/s  50 deg/s: 0.8726646259971648
     # 100 deg / s:
-    joint_velocity_limit_rad_s: float = 0.3490658503988659  # 100 deg/s / 20 deg/s  / 50 deg/s
+    joint_velocity_limit_rad_s: float = 1.7453292519943295  # 100 deg/s / 20 deg/s  / 50 deg/s
     joint_acceleration_limit_rad_s2: float = 1.7453292519943295  # 100 deg/s^2
 
     # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.

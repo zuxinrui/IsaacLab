@@ -120,7 +120,7 @@ class RewardsCfg:
     # Intention 1: Swing-up (early curriculum)
     swing_up = RewTerm(
         func=mdp.reward_swing_up,
-        weight=0.1,
+        weight=0.2,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
             "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
@@ -191,7 +191,7 @@ class RewardsCfg:
     # Intention 6: Catch success with upright gate
     catch_success_upright = RewTerm(
         func=mdp.reward_catch_success_upright,
-        weight=2.0,
+        weight=5.0,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
             "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
@@ -203,6 +203,9 @@ class RewardsCfg:
             "upright_cos_min": 0.75,
         },
     )
+
+    # Penalty: Action magnitude
+    action_magnitude = RewTerm(func=mdp.regularization_penalty, weight=0.0001)
 
     # Penalty: Undesired robot contacts
     # undesired_contacts = RewTerm(
@@ -254,8 +257,9 @@ class BallInCupEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.render_interval = 1
 
         self.sim.physx.bounce_threshold_velocity = 0.2
-        self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 1024 * 2
-        self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 1024
+        self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 1024 * 8
+        self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 1024 * 8
+        self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
 
 
 @configclass

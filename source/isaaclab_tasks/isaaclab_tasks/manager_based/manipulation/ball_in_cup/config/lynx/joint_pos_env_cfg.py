@@ -36,6 +36,7 @@ def _make_lynx_ball_in_cup_cfg() -> LynxBallInCupRobotCfg:
         ball_radius=0.02,
         string_length=0.40,
         string_radius=0.0005,
+        joint_velocity_limit_rad_s=1.7453292519943295,  # 100 deg/s
     )
 
     robot_cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(

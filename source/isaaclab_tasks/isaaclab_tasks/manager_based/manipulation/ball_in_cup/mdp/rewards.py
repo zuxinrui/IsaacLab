@@ -192,16 +192,14 @@ def _smooth_upright_gate(
     return torch.clamp((upright_cos - cos_min) / max(1.0 - cos_min, 1e-6), 0.0, 1.0)
 
 
-def _regularization_penalty(
+def regularization_penalty(
     env: ManagerBasedRLEnv,
-    robot_cfg: SceneEntityCfg,
-    lambda_act: float,
-    lambda_joint_vel: float,
+    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Small shared smoothness penalty used in all intention rewards."""
     robot: Articulation = env.scene[robot_cfg.name]
-    action_penalty = lambda_act * torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
-    joint_vel_penalty = lambda_joint_vel * torch.sum(torch.square(robot.data.joint_vel), dim=1)
+    action_penalty = torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
+    joint_vel_penalty = torch.sum(torch.square(robot.data.joint_vel), dim=1)
     return -(action_penalty + joint_vel_penalty)
 
 
@@ -212,13 +210,11 @@ def reward_lift(
     ball_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["ball"]),
     h_lift: float = 0.02,
     dh_lift: float = 0.10,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-1: reward lifting the ball above a baseline along cup axis."""
     h, _, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     base = torch.clamp((h - h_lift) / max(dh_lift, 1e-6), 0.0, 1.0)
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_above_rim(
@@ -228,13 +224,11 @@ def reward_above_rim(
     ball_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["ball"]),
     h_rim: float = 0.08,
     k_h: float = 20.0,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-2: reward being at/above cup rim height."""
     h, _, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     base = torch.sigmoid(k_h * (h - h_rim))
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_near_opening(
@@ -245,14 +239,12 @@ def reward_near_opening(
     h_gate: float = 0.04,
     dh_gate: float = 0.06,
     sigma_d: float = 0.04,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-3: reward lateral alignment near opening with height gating."""
     h, d_perp, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     g_h = torch.clamp((h - h_gate) / max(dh_gate, 1e-6), 0.0, 1.0)
     base = g_h * torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_downward_entry(
@@ -264,8 +256,6 @@ def reward_downward_entry(
     dh_entry: float = 0.04,
     sigma_d: float = 0.03,
     v_scale: float = 1.0,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-4: reward near-rim, near-axis, downward approach."""
     h, d_perp, v_parallel, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
@@ -273,7 +263,7 @@ def reward_downward_entry(
     g_d = torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
     g_v = torch.clamp((-v_parallel) / max(v_scale, 1e-6), 0.0, 1.0)
     base = g_hrim * g_d * g_v
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_catch_sparse(
@@ -285,8 +275,6 @@ def reward_catch_sparse(
     h_high: float = 0.09,
     d_enter: float = 0.025,
     v_down_min: float = 0.10,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-5: sparse catch proxy (inside opening corridor + descending)."""
     h, d_perp, v_parallel, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
@@ -294,7 +282,7 @@ def reward_catch_sparse(
     near_axis = d_perp < d_enter
     downward = v_parallel < -v_down_min
     base = (in_height & near_axis & downward).float()
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_above_cup_base(
@@ -302,8 +290,6 @@ def reward_above_cup_base(
     robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     cup_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["cup"]),
     ball_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["ball"]),
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-6: reward cup being above base height.
 
@@ -312,7 +298,7 @@ def reward_above_cup_base(
     _, _, _, _, cup_pos = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     z = cup_pos[:, 2]
     base = (1.0 + torch.tanh(7.5 * z)) / 2.0
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_ball_in_cup(
@@ -323,8 +309,6 @@ def reward_ball_in_cup(
     z_low: float = 0.01,
     z_high: float = 0.09,
     r_cup: float = 0.025,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Task-7: reward ball being inside the cup.
 
@@ -337,7 +321,7 @@ def reward_ball_in_cup(
     in_height = (h > z_low) & (h < z_high)
     in_radius = d_perp < r_cup
     base = (in_height & in_radius).float()
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_swing_up(
@@ -346,8 +330,6 @@ def reward_swing_up(
     cup_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["cup"]),
     ball_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["ball"]),
     target_height: float = 0.25,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Encourage lifting the ball high relative to the cup base in world-z.
 
@@ -365,7 +347,7 @@ def reward_swing_up(
 
     z_rel_world = ball_pos_w[:, 2] - cup_base_pos_w[:, 2]
     base = torch.clamp(z_rel_world / max(target_height, 1e-6), 0.0, 1.0)
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_above_base_upright(
@@ -376,15 +358,13 @@ def reward_above_base_upright(
     h_base: float = 0.0,
     dh: float = 0.05,
     upright_cos_min: float = 0.5,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Reward ball being above cup base along the cup axis, only when cup is upright."""
     h, _, _, _, upright_cos, _, _ = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
     g_upright = _smooth_upright_gate(upright_cos, upright_cos_min)
     g_h = torch.clamp((h - h_base) / max(dh, 1e-6), 0.0, 1.0)
     base = g_upright * g_h
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_above_rim_upright(
@@ -395,15 +375,13 @@ def reward_above_rim_upright(
     h_rim: float = 0.08,
     dh: float = 0.04,
     upright_cos_min: float = 0.6,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Reward ball reaching above the rim height along the cup axis, with upright gating."""
     h, _, _, _, upright_cos, _, _ = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
     g_upright = _smooth_upright_gate(upright_cos, upright_cos_min)
     g_h = torch.clamp((h - h_rim) / max(dh, 1e-6), 0.0, 1.0)
     base = g_upright * g_h
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_near_opening_upright(
@@ -415,8 +393,6 @@ def reward_near_opening_upright(
     dh: float = 0.04,
     sigma_d: float = 0.03,
     upright_cos_min: float = 0.6,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Reward ball being near the cup opening when the cup is upright."""
     h, d_perp, _, _, upright_cos, _, _ = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
@@ -424,7 +400,7 @@ def reward_near_opening_upright(
     g_h = torch.clamp((h - h_rim) / max(dh, 1e-6), 0.0, 1.0)
     g_d = torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
     base = g_upright * g_h * g_d
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_downward_entry_upright(
@@ -437,8 +413,6 @@ def reward_downward_entry_upright(
     sigma_d: float = 0.03,
     v_scale: float = 1.0,
     upright_cos_min: float = 0.65,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """High-value shaping reward: ball is above rim, near axis, and descending into the cup."""
     h, d_perp, v_parallel, _, upright_cos, _, _ = _cup_ball_kinematics_extended(
@@ -449,7 +423,7 @@ def reward_downward_entry_upright(
     g_d = torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
     g_v = torch.clamp((-v_parallel) / max(v_scale, 1e-6), 0.0, 1.0)
     base = g_upright * g_h * g_d * g_v
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
 
 
 def reward_catch_success_upright(
@@ -462,8 +436,6 @@ def reward_catch_success_upright(
     d_inner: float = 0.025,
     rel_speed_max: float = 0.5,
     upright_cos_min: float = 0.75,
-    lambda_act: float = 1e-3,
-    lambda_joint_vel: float = 5e-4,
 ) -> torch.Tensor:
     """Sparse success: ball is inside cup volume, cup is upright, and relative speed is small."""
     h, d_perp, _, rel_speed, upright_cos, _, _ = _cup_ball_kinematics_extended(
@@ -476,4 +448,4 @@ def reward_catch_success_upright(
     low_speed = rel_speed < rel_speed_max
 
     base = (in_height & near_axis & upright & low_speed).float()
-    return base + _regularization_penalty(env, robot_cfg, lambda_act, lambda_joint_vel)
+    return base
