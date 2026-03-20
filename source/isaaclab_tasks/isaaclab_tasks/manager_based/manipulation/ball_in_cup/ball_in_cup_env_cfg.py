@@ -104,6 +104,13 @@ class EventCfg:
 
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
 
+
+@configclass
+class EventCfg_V1:
+    """Configuration for reset/randomization events."""
+
+    reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
+
     reset_robot_joints = EventTerm(
         func=mdp.reset_joints_by_scale,
         mode="reset",
@@ -276,6 +283,22 @@ class RewardsCfg:
 
 
 @configclass
+class RewardsCfg_V1(RewardsCfg):
+    """Reward terms for a clear 5-intention state-based ball-in-a-cup task."""
+
+    # Additional penalty: Undesired robot contacts (heavier weight for v1)
+    undesired_contacts = RewTerm(
+        func=mdp.undesired_robot_contacts,
+        params={
+            "threshold": 1.0,
+            "robot_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("contact_forces"),
+        },
+        weight=-10.0,
+    )
+
+
+@configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
@@ -344,6 +367,8 @@ class BallInCupEnvCfg_V1(BallInCupEnvCfg):
         - Joint noise/perturbation.
     - Added initial joint position randomization.
     """
+    rewards: RewardsCfg_V1 = RewardsCfg_V1()
+    events: EventCfg_V1 = EventCfg_V1()
 
     def __post_init__(self):
         super().__post_init__()
@@ -365,3 +390,15 @@ class BallInCupEnvCfg_V1(BallInCupEnvCfg):
 
         # 5. Initial joint position randomization
         self.events.reset_robot_joints.params["position_range"] = (0.8, 1.2)
+
+
+@configclass
+class BallInCupEnvCfg_V1_PLAY(BallInCupEnvCfg_V1):
+    """Play configuration for the ball-in-a-cup task."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 8
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+        self.sim.render_interval = 1

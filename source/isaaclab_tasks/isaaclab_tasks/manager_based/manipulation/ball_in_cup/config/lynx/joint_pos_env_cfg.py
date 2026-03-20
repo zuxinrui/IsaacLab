@@ -13,6 +13,7 @@ from isaaclab_tasks.manager_based.manipulation.ball_in_cup.ball_in_cup_env_cfg i
     BallInCupEnvCfg,
     BallInCupEnvCfg_PLAY,
     BallInCupEnvCfg_V1,
+    BallInCupEnvCfg_V1_PLAY,
 )
 from isaaclab_tasks.manager_based.manipulation.ball_in_cup import mdp
 
@@ -179,7 +180,7 @@ class LynxBallInCupEnvCfg_V1(BallInCupEnvCfg_V1):
 
 
 @configclass
-class LynxBallInCupEnvCfg_PLAY_V1(BallInCupEnvCfg_PLAY):
+class LynxBallInCupEnvCfg_V1_PLAY(BallInCupEnvCfg_V1_PLAY):
     """Play-time Lynx ball-in-a-cup environment config."""
 
     def __post_init__(self):
