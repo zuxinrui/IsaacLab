@@ -13,6 +13,8 @@ clear multi-intention reward terms for SAC-X style training:
 - near_opening
 - downward_entry
 - catch_sparse
+
+TODO: domain randomization, contact forces
 """
 
 from dataclasses import MISSING
@@ -39,13 +41,13 @@ class BallInCupSceneCfg(InteractiveSceneCfg):
 
     robot: ArticulationCfg = MISSING  # type: ignore[assignment]
 
-    # contact_forces = ContactSensorCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/.*",
-    #     update_period=0.0,
-    #     history_length=3,
-    #     debug_vis=False,
-    #     filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"],
-    # )
+    contact_forces = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/.*",
+        update_period=0.0,
+        history_length=3,
+        debug_vis=False,
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"],
+    )
 
     plane = AssetBaseCfg(
         prim_path="/World/GroundPlane",
@@ -112,10 +114,64 @@ class EventCfg:
         },
     )
 
+    # Domain Randomization
+    randomize_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=["ball", "cup"]),
+            "mass_distribution_params": (0.5, 1.5),
+            "operation": "scale",
+        },
+    )
+
+    randomize_friction = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=["ball", "cup"]),
+            "static_friction_range": (0.5, 1.5),
+            "dynamic_friction_range": (0.5, 1.5),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 64,
+        },
+    )
+
+    randomize_gravity = EventTerm(
+        func=mdp.randomize_physics_scene_gravity,
+        mode="interval",
+        interval_range_s=(10.0, 10.0),
+        params={
+            "gravity_distribution_params": ([0.0, 0.0, -1.0], [0.0, 0.0, 1.0]),
+            "operation": "add",
+        },
+    )
+
+    joint_noise = EventTerm(
+        func=mdp.reset_joints_by_offset,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "position_range": (-0.05, 0.05),
+            "velocity_range": (-0.0, 0.0),
+        },
+    )
+
 
 @configclass
 class RewardsCfg:
     """Reward terms for a clear 5-intention state-based ball-in-a-cup task."""
+
+    # Penalty: Undesired robot contacts
+    # undesired_contacts = RewTerm(
+    #     func=mdp.undesired_robot_contacts,
+    #     params={
+    #         "threshold": 1.0,
+    #         "robot_cfg": SceneEntityCfg("robot"),
+    #         "sensor_cfg": SceneEntityCfg("contact_forces"),
+    #     },
+    #     weight=-5.0,
+    # )
 
     # Intention 1: Swing-up (early curriculum)
     swing_up = RewTerm(
@@ -191,7 +247,7 @@ class RewardsCfg:
     # Intention 6: Catch success with upright gate
     catch_success_upright = RewTerm(
         func=mdp.reward_catch_success_upright,
-        weight=5.0,
+        weight=2.0,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
             "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
@@ -272,3 +328,40 @@ class BallInCupEnvCfg_PLAY(BallInCupEnvCfg):
         self.scene.env_spacing = 2.5
         self.observations.policy.enable_corruption = False
         self.sim.render_interval = 1
+
+
+@configclass
+class BallInCupEnvCfg_V1(BallInCupEnvCfg):
+    """Configuration for the ball-in-a-cup task (v1).
+
+    Improvements:
+    - Added contact sensor for collision detection.
+    - Added collision penalty for undesired robot contacts.
+    - Added domain randomization:
+        - Object mass randomization.
+        - Friction coefficient randomization.
+        - Gravity randomization.
+        - Joint noise/perturbation.
+    - Added initial joint position randomization.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        # Domain Randomization Tuning
+        # 1. Object mass randomization
+        self.events.randomize_mass.params["mass_distribution_params"] = (0.5, 1.5)
+
+        # 2. Friction coefficient randomization
+        self.events.randomize_friction.params["static_friction_range"] = (0.5, 1.5)
+        self.events.randomize_friction.params["dynamic_friction_range"] = (0.5, 1.5)
+
+        # 3. Gravity randomization
+        self.events.randomize_gravity.params["gravity_distribution_params"] = ([0.0, 0.0, -1.0], [0.0, 0.0, 1.0])
+
+        # 4. Joint noise/perturbation
+        self.events.joint_noise.params["position_range"] = (-0.05, 0.05)
+        self.events.joint_noise.params["velocity_range"] = (-0.0, 0.0)
+
+        # 5. Initial joint position randomization
+        self.events.reset_robot_joints.params["position_range"] = (0.8, 1.2)

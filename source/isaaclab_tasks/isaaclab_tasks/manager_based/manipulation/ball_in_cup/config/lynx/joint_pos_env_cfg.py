@@ -9,7 +9,11 @@ import isaaclab.sim as sim_utils
 from isaaclab.utils import configclass
 
 from isaaclab_assets.robots.lynx_ball_in_cup import LynxBallInCupConstructor, LynxBallInCupRobotCfg
-from isaaclab_tasks.manager_based.manipulation.ball_in_cup.ball_in_cup_env_cfg import BallInCupEnvCfg, BallInCupEnvCfg_PLAY
+from isaaclab_tasks.manager_based.manipulation.ball_in_cup.ball_in_cup_env_cfg import (
+    BallInCupEnvCfg,
+    BallInCupEnvCfg_PLAY,
+    BallInCupEnvCfg_V1,
+)
 from isaaclab_tasks.manager_based.manipulation.ball_in_cup import mdp
 
 
@@ -143,3 +147,61 @@ class LynxBallInCupEnvCfg_PLAY(BallInCupEnvCfg_PLAY):
             clip={".*": (-1.0, 1.0)},
         )
 
+
+@configclass
+class LynxBallInCupEnvCfg_V1(BallInCupEnvCfg_V1):
+    """Lynx ball-in-a-cup environment config."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        # Performance-oriented simulation setup for play/inference:
+        # keep 5Hz control while reducing expensive physics sub-steps.
+        # for the "ball in a cup" task, we need higher sim frequency:
+        self.sim.dt = 1.0 / 60.0
+        self.decimation = 12
+        self.sim.render_interval = 1
+
+        # Relax global solver settings for throughput (sufficient for push task stability).
+        self.sim.physx.bounce_threshold_velocity = 0.2
+        # 16k-env broadphase requires larger aggregate pair buffers.
+        self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 2048
+        self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 2048
+
+        self.scene.robot = _make_lynx_ball_in_cup_cfg()
+
+        self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
+            asset_name="robot",
+            joint_names=["joint_[1-6]"],
+            scale=0.1745,
+            clip={".*": (-1.0, 1.0)},
+        )
+
+
+@configclass
+class LynxBallInCupEnvCfg_PLAY_V1(BallInCupEnvCfg_PLAY):
+    """Play-time Lynx ball-in-a-cup environment config."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        # Performance-oriented simulation setup for play/inference:
+        # keep 5Hz control while reducing expensive physics sub-steps.
+        self.sim.dt = 1.0 / 60.0
+        self.decimation = 12
+        self.sim.render_interval = 1
+
+        # Relax global solver settings for throughput (sufficient for push task stability).
+        self.sim.physx.bounce_threshold_velocity = 0.2
+        # 16k-env broadphase requires larger aggregate pair buffers.
+        self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 256
+        self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 256
+
+        self.scene.robot = _make_lynx_ball_in_cup_cfg()
+
+        self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
+            asset_name="robot",
+            joint_names=["joint_[1-6]"],
+            scale=0.1745,
+            clip={".*": (-1.0, 1.0)},
+        )

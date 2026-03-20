@@ -16,7 +16,7 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcem
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Open-Drawer-Franka-v0 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-v0 --distributed --headless --num_envs 16384
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lynx-ObsDelay-v0 --distributed --headless --num_envs 16384
-python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v0 --distributed --headless --num_envs 8192
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v1 --distributed --headless --num_envs 8192
 
 
 
@@ -39,7 +39,7 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lyn
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Trapezoidal-v0 --num_envs 1024 --headless
 
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v0 --headless --num_envs 32
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v1 --headless --num_envs 32
 python scripts/reinforcement_learning/skrl/train_sacx.py --task Isaac-Ball-In-Cup-Lynx-v0 --num_envs 1024 --total_steps 200000 --headless
 
 

@@ -62,13 +62,18 @@ def undesired_robot_contacts(
         tracked_body_ids = list(range(*tracked_body_ids.indices(len(body_names))))
     
     # Create a mask for tracked bodies that should trigger the penalty
-    mask = torch.ones(len(tracked_body_ids), dtype=torch.bool, device=contact_sensor.device)
+    # contact_forces shape is (num_envs, num_bodies_in_sensor, 3)
+    # We need to ensure the mask matches the number of bodies in the sensor
+    num_bodies_in_sensor = contact_forces.shape[1]
+    mask = torch.ones(num_bodies_in_sensor, dtype=torch.bool, device=contact_sensor.device)
+    
     for i, body_id in enumerate(tracked_body_ids):
+        if i >= num_bodies_in_sensor:
+            break
         if body_id in exclude_indices:
             mask[i] = False
 
     # Sum the contact force magnitudes for all other bodies
-    # contact_forces shape is (num_envs, len(tracked_body_ids), 3)
     relevant_contact_forces = contact_forces[:, mask, :]
     if relevant_contact_forces.shape[1] == 0:
         return torch.zeros(env.num_envs, device=contact_sensor.device)
