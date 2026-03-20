@@ -62,6 +62,6 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx
 # Interactive debug command (GUI, fewer envs for smooth viewport):
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-Play-v0 --num_envs 8 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-18_23-07-04 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-18_23-07-04/model_1499.pt
 
-python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v0 --num_envs 8 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-19_13-46-12 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-19_13-46-12/model_100.pt
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v1 --num_envs 64 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/Lynx_ball_in_cup/2026-03-20_01-52-04 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/Lynx_ball_in_cup/2026-03-20_01-52-04/model_550.pt
 
 
