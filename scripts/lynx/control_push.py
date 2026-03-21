@@ -178,6 +178,16 @@ def main():
         "rigid_props": robot_cfg.spawn.rigid_props,
         "articulation_props": robot_cfg.spawn.articulation_props,
         "activate_contact_sensors": robot_cfg.spawn.activate_contact_sensors,
+        "l1_end_point_pos": robot_cfg.l1_end_point_pos,
+        "l1_end_point_theta": robot_cfg.l1_end_point_theta,
+        "l2_end_point_pos": robot_cfg.l2_end_point_pos,
+        "l2_end_point_theta": robot_cfg.l2_end_point_theta,
+        "l3_end_point_pos": robot_cfg.l3_end_point_pos,
+        "l3_end_point_theta": robot_cfg.l3_end_point_theta,
+        "l4_end_point_pos": robot_cfg.l4_end_point_pos,
+        "l4_end_point_theta": robot_cfg.l4_end_point_theta,
+        "l5_end_point_pos": robot_cfg.l5_end_point_pos,
+        "l5_end_point_theta": robot_cfg.l5_end_point_theta,
     }
     
     # Wrap in Articulation
