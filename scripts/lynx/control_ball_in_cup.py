@@ -8,6 +8,7 @@
 import argparse
 import torch
 import numpy as np
+import re
 
 from isaaclab.app import AppLauncher
 
@@ -34,21 +35,62 @@ class LynxInteractiveGui:
         self.num_joints = robot.num_joints
         self.joint_names = robot.data.joint_names
         
+        # Identify actuated joints (those with stiffness > 0)
+        self.actuated_joint_indices = []
+        
+        # Heuristic: Lynx arm joints are named joint_1 to joint_6
+        # We can also check the actuator config
+        for i in range(self.num_joints):
+            joint_name = self.joint_names[i]
+            is_actuated = False
+            
+            # Check if it matches any actuator expression
+            for actuator_name, actuator_cfg in robot.cfg.actuators.items():
+                for expr in actuator_cfg.joint_names_expr:
+                    if re.search(expr, joint_name):
+                        # Check stiffness
+                        stiffness = actuator_cfg.stiffness
+                        if isinstance(stiffness, dict):
+                            val = stiffness.get(joint_name, 0.0)
+                            if val > 0:
+                                is_actuated = True
+                        elif stiffness is not None and stiffness > 0:
+                            is_actuated = True
+                if is_actuated:
+                    break
+            
+            if is_actuated:
+                self.actuated_joint_indices.append(i)
+
         # Create a window
-        self.window = ui.Window("Lynx Joint Control", width=400, height=300)
+        self.window = ui.Window(
+            "Lynx Joint Control",
+            width=400,
+            height=400,
+            dockPreference=ui.DockPreference.RIGHT_BOTTOM
+        )
+        self.window.deferred_dock_in("Property")
         
         # Target positions (initialized to current)
         self.target_joint_pos = robot.data.joint_pos[0].clone()
         
         with self.window.frame:
             with ui.VStack(spacing=5):
-                ui.Label("Adjust Joint Positions (Radians)", alignment=ui.Alignment.CENTER)
+                ui.Label("Adjust Actuated Joint Positions (Radians)", alignment=ui.Alignment.CENTER)
+                ui.Spacer(height=10)
+
+                def on_reset():
+                    for idx, slider in self.sliders.items():
+                        slider.model.set_value(0.0)
+                        self.target_joint_pos[idx] = 0.0
+                
+                ui.Button("Reset Actuated to Zero", clicked_fn=on_reset)
                 ui.Spacer(height=10)
                 
-                self.sliders = []
-                for i in range(self.num_joints):
+                self.sliders = {}
+                for i in self.actuated_joint_indices:
                     with ui.HStack():
-                        ui.Label(f"{self.joint_names[i]}:", width=100)
+                        ui.Label(f"{self.joint_names[i]}:", width=120)
                         slider = ui.FloatSlider(min=-3.14, max=3.14)
                         slider.model.set_value(float(self.target_joint_pos[i]))
                         
@@ -57,15 +99,7 @@ class LynxInteractiveGui:
                             self.target_joint_pos[idx] = model.get_value_as_float()
                         
                         slider.model.add_value_changed_fn(on_change)
-                        self.sliders.append(slider)
-                
-                ui.Spacer(height=10)
-                def on_reset():
-                    for slider in self.sliders:
-                        slider.model.set_value(0.0)
-                    self.target_joint_pos.fill_(0.0)
-                
-                ui.Button("Reset to Zero", clicked_fn=on_reset)
+                        self.sliders[i] = slider
 
     def get_target_pos(self):
         return self.target_joint_pos
@@ -93,11 +127,11 @@ def main():
         num_joints=6,
         genotype_tube=[0, 1, 0, 1, 0],
         genotype_joints=1,
-        rotation_angles=[180.0, 60.0, 60.0, -180.0, 60.0, 90.0],
+        rotation_angles=[180.0, 0.0, 0.0, -180.0, 0.0, 90.0],
         l1_end_point_pos=(0.0, 0.0, 0.2),
         l1_end_point_theta=0.0,
-        l2_end_point_pos=(0.0, 0.05, 0.2),
-        l2_end_point_theta=30.0,
+        l2_end_point_pos=(0.0, 0.0, 0.2),
+        l2_end_point_theta=0.0,
         l3_end_point_pos=(0.0, 0.0, 0.2),
         l3_end_point_theta=0.0,
         l4_end_point_pos=(0.0, 0.05, 0.2),
@@ -105,10 +139,10 @@ def main():
         l5_end_point_pos=(0.0, 0.0, 0.2),
         l5_end_point_theta=0.0,
         # Ball in cup specific
-        cup_radius=0.04,
+        cup_radius=0.05,
         cup_height=0.08,
         ball_radius=0.02,
-        string_length=0.3
+        string_length=0.4
     )
     
     # Set the spawn function

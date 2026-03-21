@@ -88,21 +88,21 @@ class LynxRobotCfg(ArticulationCfg):
             effort_limit_sim=130.0,
             velocity_limit_sim=joint_velocity_limit_rad_s,
             stiffness=800.0,
-            damping=40.0,
+            damping=75.0,
         ),
         "lynx_arm_standard": ImplicitActuatorCfg(
             joint_names_expr=["joint_[3-4]"],
             effort_limit_sim=54.0,
             velocity_limit_sim=joint_velocity_limit_rad_s,
             stiffness=800.0,
-            damping=40.0,
+            damping=75.0,
         ),
         "lynx_arm_lite": ImplicitActuatorCfg(
             joint_names_expr=["joint_[5-6]"],
             effort_limit_sim=19.0,
             velocity_limit_sim=joint_velocity_limit_rad_s,
             stiffness=800.0,
-            damping=40.0,
+            damping=75.0,
         ),
     }
 
@@ -421,7 +421,7 @@ class LynxUsdConstructor:
             metallic=1.0,
             roughness=0.2,
         )
-        dark_grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.1, 0.1, 0.1))
+        tube_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.015, 0.06, 0.035))
         ee_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.15, 0.15, 0.15))
         red_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2))
         shared_physics_material = sim_utils.spawners.materials.RigidBodyMaterialCfg(
@@ -660,7 +660,9 @@ class LynxUsdConstructor:
 
                 # Create segments
                 last_seg_quat = Gf.Quatf(1, 0, 0, 0)
-                actual_end_pos = p3
+                # actual_end_pos = p3
+                actual_end_pos = Gf.Vec3f(0, 0, 0)  # init
+
                 for j in range(num_segs):
                     p_start = curve_points[j]
                     p_end = curve_points[j+1]
@@ -677,6 +679,7 @@ class LynxUsdConstructor:
                         seg_len = mounting_l_end
                         shifted_start = p_start + start_offset_vec
                         seg_center = shifted_start + direction * (seg_len / 2)
+                        actual_end_pos = shifted_start + direction * seg_len
                     else:
                         seg_len = auto_length
                         shifted_start = p_start + start_offset_vec
@@ -694,9 +697,6 @@ class LynxUsdConstructor:
                         seg_quat = Gf.Quatf(Gf.Rotation(Gf.Vec3d(axis), angle).GetQuat())
                     
                     last_seg_quat = seg_quat
-                    if is_last:
-                        shifted_start = p_start + start_offset_vec
-                        actual_end_pos = shifted_start + direction * seg_len
 
                     sim_utils.spawners.meshes.spawn_mesh_cylinder(
                         f"{tube_path}/visual_{j}",
@@ -706,7 +706,7 @@ class LynxUsdConstructor:
                             collision_props=body_collision_cfg,
                             physics_material_path=shared_physics_material_path,
                             physics_material=shared_physics_material,
-                            visual_material=dark_grey_material,
+                            visual_material=tube_material,
                         ),
                         translation=tuple(seg_center),
                         orientation=self._quat_to_tuple(seg_quat)
@@ -722,7 +722,7 @@ class LynxUsdConstructor:
                     center_of_mass=(0.0, 0.0, approx_length / 2.0),
                 )
                 curr_parent_path = tube_path
-                curr_pos = end_pos  # end_pos / actual_end_pos
+                curr_pos = actual_end_pos  # end_pos / actual_end_pos
                 curr_quat = last_seg_quat
                 
                 tube_idx += 1
@@ -888,9 +888,10 @@ class LynxUsdConstructor:
                 # joint anchors, moving part, and next curr_pos preserves relative geometry.
                 # IMPORTANT: avoid cumulative over-shift only for truly consecutive
                 # orthogonal joints. If there is a tube between joints, treat as non-consecutive.
-                prev_has_tube = i > 0 and (i - 1) < len(self.cfg.genotype_tube) and bool(self.cfg.genotype_tube[i - 1])
-                prev_is_orthogonal = i > 0 and joint_types[i - 1] == "orthogonal" and not prev_has_tube
-                orth_module_shift = Gf.Vec3f(0, -(l0_orig + r1), 0.0) if not prev_has_tube else curr_quat.Transform(Gf.Vec3f(0, 0, l0_orig + r1))
+
+                # prev_has_tube = i > 0 and (i - 1) < len(self.cfg.genotype_tube) and bool(self.cfg.genotype_tube[i - 1])
+                # prev_is_orthogonal = i > 0 and joint_types[i - 1] == "orthogonal" and not prev_has_tube
+                # orth_module_shift = Gf.Vec3f(0, -(l0_orig + r1), 0.0) if not prev_has_tube else curr_quat.Transform(Gf.Vec3f(0, 0, l0_orig + r1))
 
                 sim_utils.spawners.meshes.spawn_mesh_cylinder(
                     f"{curr_parent_path}/{joint_name}_fixed_visual_0",

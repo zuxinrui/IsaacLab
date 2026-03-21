@@ -28,7 +28,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
-from isaaclab.sensors import ContactSensorCfg
+# from isaaclab.sensors import ContactSensorCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 
@@ -41,13 +41,13 @@ class BallInCupSceneCfg(InteractiveSceneCfg):
 
     robot: ArticulationCfg = MISSING  # type: ignore[assignment]
 
-    contact_forces = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/.*",
-        update_period=0.0,
-        history_length=3,
-        debug_vis=False,
-        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"],
-    )
+    # contact_forces = ContactSensorCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/.*",
+    #     update_period=0.0,
+    #     history_length=3,
+    #     debug_vis=False,
+    #     filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"],
+    # )
 
     plane = AssetBaseCfg(
         prim_path="/World/GroundPlane",
@@ -236,20 +236,20 @@ class RewardsCfg:
     )
 
     # Intention 5: Downward entry with upright gate
-    downward_entry_upright = RewTerm(
-        func=mdp.reward_downward_entry_upright,
-        weight=1.0,
-        params={
-            "robot_cfg": SceneEntityCfg("robot"),
-            "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
-            "ball_cfg": SceneEntityCfg("robot", body_names=["ball"]),
-            "h_rim": 0.08,
-            "dh_entry": 1.0,
-            "sigma_d": 0.03,
-            "v_scale": 1.0,
-            "upright_cos_min": 0.5,
-        },
-    )
+    # downward_entry_upright = RewTerm(
+    #     func=mdp.reward_downward_entry_upright,
+    #     weight=1.0,
+    #     params={
+    #         "robot_cfg": SceneEntityCfg("robot"),
+    #         "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
+    #         "ball_cfg": SceneEntityCfg("robot", body_names=["ball"]),
+    #         "h_rim": 0.08,
+    #         "dh_entry": 1.0,
+    #         "sigma_d": 0.03,
+    #         "v_scale": 1.0,
+    #         "upright_cos_min": 0.5,
+    #     },
+    # )
 
     # Intention 6: Catch success with upright gate
     catch_success_upright = RewTerm(
@@ -261,7 +261,7 @@ class RewardsCfg:
             "ball_cfg": SceneEntityCfg("robot", body_names=["ball"]),
             "h_low": 0.01,
             "h_high": 0.09,
-            "d_inner": 0.1,
+            "d_inner": 0.3,
             "rel_speed_max": 0.5,
             "upright_cos_min": 0.75,
         },
@@ -269,6 +269,17 @@ class RewardsCfg:
 
     # Penalty: Action magnitude
     action_magnitude = RewTerm(func=mdp.regularization_penalty, weight=0.0001)
+
+    # Penalty: Joint height
+    # joint_height_penalty = RewTerm(
+    #     func=mdp.joint_height_penalty,
+    #     weight=-1.0,
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names=["joint_.*"]),
+    #         "height_threshold": 0.07,
+    #         "soft_margin": 0.03,
+    #     },
+    # )
 
     # Penalty: Undesired robot contacts
     # undesired_contacts = RewTerm(
@@ -294,7 +305,7 @@ class RewardsCfg_V1(RewardsCfg):
             "robot_cfg": SceneEntityCfg("robot"),
             "sensor_cfg": SceneEntityCfg("contact_forces"),
         },
-        weight=-10.0,
+        weight=-1.0,
     )
 
 
@@ -394,6 +405,39 @@ class BallInCupEnvCfg_V1(BallInCupEnvCfg):
 
 @configclass
 class BallInCupEnvCfg_V1_PLAY(BallInCupEnvCfg_V1):
+    """Play configuration for the ball-in-a-cup task."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 8
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+        self.sim.render_interval = 1
+
+
+@configclass
+class BallInCupEnvCfg_V2(BallInCupEnvCfg):
+    """Configuration for the ball-in-a-cup task (v1).
+
+    Improvements:
+    - Added contact sensor for collision detection.
+    - Added collision penalty for undesired robot contacts.
+    - Added domain randomization:
+        - Object mass randomization.
+        - Friction coefficient randomization.
+        - Gravity randomization.
+        - Joint noise/perturbation.
+    - Added initial joint position randomization.
+    """
+    rewards: RewardsCfg_V1 = RewardsCfg_V1()  # including undesired contact penalty
+    events: EventCfg = EventCfg()
+
+    def __post_init__(self):
+        super().__post_init__()
+
+
+@configclass
+class BallInCupEnvCfg_V2_PLAY(BallInCupEnvCfg_V2):
     """Play configuration for the ball-in-a-cup task."""
 
     def __post_init__(self):

@@ -15,7 +15,7 @@ from .lynx_constructor import LynxUsdConstructor, LynxRobotCfg, LynxUsdConstruct
 @configclass
 class LynxBallInCupRobotCfg(LynxRobotCfg):
     """Configuration for the Lynx robot with a ball and a cup."""
-    cup_radius: float = 0.04
+    cup_radius: float = 0.05
     cup_height: float = 0.08
     ball_radius: float = 0.02
     string_length: float = 0.4
@@ -43,10 +43,10 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
         ee_cyl_path = f"{root_path}/ee_cylinder"
         ee_cyl_length = 0.07
 
-        grey_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
-            diffuse_color=(0.25, 0.25, 0.25),
-            metallic=1.0,
-            roughness=0.2,
+        cup_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=(0.25, 0.38, 0.48),
+            # metallic=1.0,
+            roughness=0.7,
         )
         white_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 1.0))
         red_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2))
@@ -78,7 +78,7 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
         
         # Hollow Cup Implementation:
         # We use a thin cylinder for the bottom and multiple cuboids for the walls.
-        wall_thickness = 0.005
+        wall_thickness = 0.003
         num_wall_segments = 12
         import math
 
@@ -95,7 +95,7 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
             sim_utils.spawners.MeshCylinderCfg(
                 radius=self.cfg.cup_radius,
                 height=wall_thickness,
-                visual_material=grey_material,
+                visual_material=cup_material,
                 physics_material=shared_physics_material,
                 collision_props=sim_utils.CollisionPropertiesCfg()
             ),
@@ -122,7 +122,7 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
                 f"{cup_path}/wall_{i}",
                 sim_utils.spawners.MeshCuboidCfg(
                     size=(wall_height, wall_thickness, segment_width),
-                    visual_material=grey_material,
+                    visual_material=cup_material,
                     physics_material=shared_physics_material,
                     collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=True),
                 ),

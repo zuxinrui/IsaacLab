@@ -454,3 +454,39 @@ def reward_catch_success_upright(
 
     base = (in_height & near_axis & upright & low_speed).float()
     return base
+
+
+def joint_height_penalty(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    height_threshold: float = 0.07,
+    soft_margin: float = 0.03,
+) -> torch.Tensor:
+    """Penalize robot joints if they are below a certain height.
+
+    The penalty is soft between (height_threshold) and (height_threshold + soft_margin).
+    Below height_threshold, the penalty is 1.0.
+    Above height_threshold + soft_margin, the penalty is 0.0.
+
+    Args:
+        env: The environment.
+        asset_cfg: The robot configuration. Defaults to SceneEntityCfg("robot").
+        height_threshold: The height below which the penalty is maximum. Defaults to 0.07.
+        soft_margin: The margin over which the penalty transitions from 1.0 to 0.0. Defaults to 0.03.
+
+    Returns:
+        Penalty tensor of shape (num_envs,).
+    """
+    robot: Articulation = env.scene[asset_cfg.name]
+    # Get joint positions in world frame: (num_envs, num_bodies, 3)
+    # We use body_pos_w because joints are typically associated with bodies
+    body_pos_w = robot.data.body_pos_w[:, asset_cfg.body_ids, :]
+    # Get z-heights: (num_envs, num_bodies)
+    z_heights = body_pos_w[..., 2]
+
+    # Calculate penalty: 1.0 if z < height_threshold, 0.0 if z > height_threshold + soft_margin
+    # Linear interpolation in between
+    penalty = torch.clamp((height_threshold + soft_margin - z_heights) / max(soft_margin, 1e-6), 0.0, 1.0)
+
+    # Sum or max the penalty across joints? Max is usually better for "stay away" constraints
+    return torch.max(penalty, dim=-1)[0]

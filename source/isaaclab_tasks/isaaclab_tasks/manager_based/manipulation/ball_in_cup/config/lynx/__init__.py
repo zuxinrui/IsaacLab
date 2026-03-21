@@ -56,3 +56,27 @@ gym.register(
 )
 
 
+gym.register(
+    id="Isaac-Ball-In-Cup-Lynx-v2",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:LynxBallInCupEnvCfg_V2",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BallInCupPPORunnerCfg",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+    disable_env_checker=True,
+)
+
+
+gym.register(
+    id="Isaac-Ball-In-Cup-Lynx-Play-v2",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:LynxBallInCupEnvCfg_V2_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BallInCupPPORunnerCfg",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+    disable_env_checker=True,
+)
+
+
