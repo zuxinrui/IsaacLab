@@ -20,6 +20,33 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
+# Global cache for kinematics to avoid redundant calculations per step
+_KINETICS_CACHE = {
+    "step_count": -1,
+    "data": None,
+}
+
+
+def _get_cached_kinematics(
+    env: ManagerBasedRLEnv,
+    robot_cfg: SceneEntityCfg,
+    cup_cfg: SceneEntityCfg,
+    ball_cfg: SceneEntityCfg,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Get or compute cup-ball kinematics, cached per simulation step."""
+    global _KINETICS_CACHE
+    # Use a small epsilon for float comparison or round the time to avoid precision issues
+    current_time = env.sim.current_time
+    
+    if abs(_KINETICS_CACHE["step_count"] - current_time) > 1e-6:
+        # print(f"Computing kinematics for time {current_time:.4f} (cache step { _KINETICS_CACHE['step_count']:.4f})")
+        _KINETICS_CACHE["step_count"] = current_time
+        _KINETICS_CACHE["data"] = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
+    
+    # print(f"Using cached kinematics for time {current_time:.4f}")
+    return _KINETICS_CACHE["data"]
+
+
 def undesired_robot_contacts(
     env: ManagerBasedRLEnv,
     threshold: float,
@@ -217,7 +244,7 @@ def reward_lift(
     dh_lift: float = 0.10,
 ) -> torch.Tensor:
     """Task-1: reward lifting the ball above a baseline along cup axis."""
-    h, _, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    h, _, _, _, _, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     base = torch.clamp((h - h_lift) / max(dh_lift, 1e-6), 0.0, 1.0)
     return base
 
@@ -231,7 +258,7 @@ def reward_above_rim(
     k_h: float = 20.0,
 ) -> torch.Tensor:
     """Task-2: reward being at/above cup rim height."""
-    h, _, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    h, _, _, _, _, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     base = torch.sigmoid(k_h * (h - h_rim))
     return base
 
@@ -246,7 +273,7 @@ def reward_near_opening(
     sigma_d: float = 0.04,
 ) -> torch.Tensor:
     """Task-3: reward lateral alignment near opening with height gating."""
-    h, d_perp, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    h, d_perp, _, _, _, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     g_h = torch.clamp((h - h_gate) / max(dh_gate, 1e-6), 0.0, 1.0)
     base = g_h * torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
     return base
@@ -263,7 +290,7 @@ def reward_downward_entry(
     v_scale: float = 1.0,
 ) -> torch.Tensor:
     """Task-4: reward near-rim, near-axis, downward approach."""
-    h, d_perp, v_parallel, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    h, d_perp, v_parallel, _, _, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     g_hrim = torch.clamp((h - h_rim) / max(dh_entry, 1e-6), 0.0, 1.0)
     g_d = torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
     g_v = torch.clamp((-v_parallel) / max(v_scale, 1e-6), 0.0, 1.0)
@@ -282,7 +309,7 @@ def reward_catch_sparse(
     v_down_min: float = 0.10,
 ) -> torch.Tensor:
     """Task-5: sparse catch proxy (inside opening corridor + descending)."""
-    h, d_perp, v_parallel, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    h, d_perp, v_parallel, _, _, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     in_height = (h > h_low) & (h < h_high)
     near_axis = d_perp < d_enter
     downward = v_parallel < -v_down_min
@@ -300,7 +327,7 @@ def reward_above_cup_base(
 
     r_6(z) = (1 + tanh(7.5 * z)) / 2
     """
-    _, _, _, _, cup_pos = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    _, _, _, _, _, _, cup_pos = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     z = cup_pos[:, 2]
     base = (1.0 + torch.tanh(7.5 * z)) / 2.0
     return base
@@ -320,7 +347,7 @@ def reward_ball_in_cup(
     in_cup = (z_low < z < z_high) AND (x^2 + y^2 < r_cup^2)
     where (x, y, z) is the ball position relative to the cup in cup frame.
     """
-    h, d_perp, _, _, _ = _cup_ball_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
+    h, d_perp, _, _, _, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     # h is the projection of rel_pos onto cup_axis (z in cup frame)
     # d_perp is the norm of the perpendicular component (sqrt(x^2 + y^2) in cup frame)
     in_height = (h > z_low) & (h < z_high)
@@ -348,7 +375,7 @@ def reward_swing_up(
         _,
         ball_pos_w,
         cup_base_pos_w,
-    ) = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
+    ) = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
 
     z_rel_world = ball_pos_w[:, 2] - cup_base_pos_w[:, 2]
     base = torch.clamp(z_rel_world / max(target_height, 1e-6), 0.0, 1.0)
@@ -365,7 +392,7 @@ def reward_above_base_upright(
     upright_cos_min: float = 0.5,
 ) -> torch.Tensor:
     """Reward ball being above cup base along the cup axis, only when cup is upright."""
-    h, _, _, _, upright_cos, _, _ = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
+    h, _, _, _, upright_cos, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     g_upright = _smooth_upright_gate(upright_cos, upright_cos_min)
     g_h = torch.clamp((h - h_base) / max(dh, 1e-6), 0.0, 1.0)
     base = g_upright * g_h
@@ -382,7 +409,7 @@ def reward_above_rim_upright(
     upright_cos_min: float = 0.6,
 ) -> torch.Tensor:
     """Reward ball reaching above the rim height along the cup axis, with upright gating."""
-    h, _, _, _, upright_cos, _, _ = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
+    h, _, _, _, upright_cos, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     g_upright = _smooth_upright_gate(upright_cos, upright_cos_min)
     g_h = torch.clamp((h - h_rim) / max(dh, 1e-6), 0.0, 1.0)
     base = g_upright * g_h
@@ -400,7 +427,7 @@ def reward_near_opening_upright(
     upright_cos_min: float = 0.6,
 ) -> torch.Tensor:
     """Reward ball being near the cup opening when the cup is upright."""
-    h, d_perp, _, _, upright_cos, _, _ = _cup_ball_kinematics_extended(env, robot_cfg, cup_cfg, ball_cfg)
+    h, d_perp, _, _, upright_cos, _, _ = _get_cached_kinematics(env, robot_cfg, cup_cfg, ball_cfg)
     g_upright = _smooth_upright_gate(upright_cos, upright_cos_min)
     g_h = torch.clamp((h - h_rim) / max(dh, 1e-6), 0.0, 1.0)
     g_d = torch.exp(-(d_perp * d_perp) / max(sigma_d * sigma_d, 1e-9))
@@ -420,7 +447,7 @@ def reward_downward_entry_upright(
     upright_cos_min: float = 0.65,
 ) -> torch.Tensor:
     """High-value shaping reward: ball is above rim, near axis, and descending into the cup."""
-    h, d_perp, v_parallel, _, upright_cos, _, _ = _cup_ball_kinematics_extended(
+    h, d_perp, v_parallel, _, upright_cos, _, _ = _get_cached_kinematics(
         env, robot_cfg, cup_cfg, ball_cfg
     )
     g_upright = _smooth_upright_gate(upright_cos, upright_cos_min)
@@ -443,7 +470,7 @@ def reward_catch_success_upright(
     upright_cos_min: float = 0.75,
 ) -> torch.Tensor:
     """Sparse success: ball is inside cup volume, cup is upright, and relative speed is small."""
-    h, d_perp, _, rel_speed, upright_cos, _, _ = _cup_ball_kinematics_extended(
+    h, d_perp, _, rel_speed, upright_cos, _, _ = _get_cached_kinematics(
         env, robot_cfg, cup_cfg, ball_cfg
     )
 
@@ -489,4 +516,6 @@ def joint_height_penalty(
     penalty = torch.clamp((height_threshold + soft_margin - z_heights) / max(soft_margin, 1e-6), 0.0, 1.0)
 
     # Sum or max the penalty across joints? Max is usually better for "stay away" constraints
-    return torch.max(penalty, dim=-1)[0]
+    if penalty.dim() > 1:
+        return torch.max(penalty, dim=-1)[0]
+    return penalty

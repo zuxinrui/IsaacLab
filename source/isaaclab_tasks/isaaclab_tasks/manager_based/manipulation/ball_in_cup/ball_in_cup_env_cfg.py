@@ -76,11 +76,11 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         # robot proprioception
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        # joint_vel = ObsTerm(func=mdp.joint_vel_rel)
 
         # task-centric geometric features
         cup_ball_features = ObsTerm(
-            func=mdp.cup_ball_features,
+            func=mdp.cup_ball_features_short,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
                 "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
@@ -271,15 +271,15 @@ class RewardsCfg:
     action_magnitude = RewTerm(func=mdp.regularization_penalty, weight=0.0001)
 
     # Penalty: Joint height
-    # joint_height_penalty = RewTerm(
-    #     func=mdp.joint_height_penalty,
-    #     weight=-1.0,
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", body_names=["joint_.*"]),
-    #         "height_threshold": 0.07,
-    #         "soft_margin": 0.03,
-    #     },
-    # )
+    joint_height_penalty = RewTerm(
+        func=mdp.joint_height_penalty,
+        weight=-0.1,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=["link_3", "link_4", "link_5", "link_6", "ee_cylinder"]),
+            "height_threshold": 0.1,
+            "soft_margin": 0.05,
+        },
+    )
 
     # Penalty: Undesired robot contacts
     # undesired_contacts = RewTerm(

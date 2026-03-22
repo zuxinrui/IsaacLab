@@ -39,7 +39,7 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Push-Cube-Lyn
 
 python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Reach-Lynx-Trapezoidal-v0 --num_envs 1024 --headless
 
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v1 --headless --num_envs 32
+python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ball-In-Cup-Lynx-v0 --headless --num_envs 32
 python scripts/reinforcement_learning/skrl/train_sacx.py --task Isaac-Ball-In-Cup-Lynx-v0 --num_envs 1024 --total_steps 200000 --headless
 
 
