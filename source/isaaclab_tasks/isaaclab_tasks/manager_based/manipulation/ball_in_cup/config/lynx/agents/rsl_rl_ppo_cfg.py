@@ -12,7 +12,7 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 class BallInCupPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 2000
-    save_interval = 50
+    save_interval = 500
     experiment_name = "lynx_ball_in_cup"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,

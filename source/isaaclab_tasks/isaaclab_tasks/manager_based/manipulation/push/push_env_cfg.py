@@ -378,7 +378,7 @@ class PushGoalRewardsCfg:
 
     # 5. Smoothness penalty
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.001)
-    # action_l2 = RewTerm(func=mdp.action_l2, weight=-0.1)
+    action_l2 = RewTerm(func=mdp.action_l2, weight=-0.001)
 
     # Add joint_vel back to avoid curriculum errors
     joint_vel = RewTerm(
@@ -406,7 +406,7 @@ class PushGoalRewardsCfg:
             "threshold": 1.0,
             "object_cfg": SceneEntityCfg("object"),
             "robot_cfg": SceneEntityCfg("robot"),
-            "ee_link_cfg": SceneEntityCfg("robot", body_names=["ee", "ee_cylinder", "link_6"]),
+            "ee_link_cfg": SceneEntityCfg("robot", body_names=["ee", "ee_cylinder", "link_6"]),  # link_6
             "sensor_cfg": SceneEntityCfg("contact_forces"),
         },
         weight=-5.0,
@@ -513,13 +513,13 @@ class PushGoalEnvCfg(PushEnvCfg):
         # Randomize positions more broadly if needed
         self.events.reset_object_position.params["pose_range"] = {
             "x": (-0.1, 0.1),
-            "y": (-0.2, 0.2),
+            "y": (-0.25, 0.25),
             "z": (0.0, 0.0),
             "yaw": (-3.14159, 3.14159),
         }
         self.events.reset_target_position.params["pose_range"] = {
             "x": (-0.1, 0.1),
-            "y": (-0.2, 0.2),
+            "y": (-0.25, 0.25),
             "z": (0.0, 0.0),
             "yaw": (-3.14159, 3.14159),
         }

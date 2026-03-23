@@ -41,6 +41,8 @@ def _make_lynx_robot_cfg() -> LynxRobotCfg:
         l4_end_point_theta=0.0,
         l5_end_point_pos=(0.0, 0.0, 0.2),
         l5_end_point_theta=0.0,
+        joint_velocity_limit_rad_s=0.3490658503988659,  # 20 deg/s
+        joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
     )
     # Performance: reduce procedural tube tessellation to lower USD prim count,
     # collision complexity and broadphase pressure in large batched scenes.
@@ -70,6 +72,18 @@ def _make_lynx_robot_cfg() -> LynxRobotCfg:
         "rigid_props": robot_cfg.spawn.rigid_props,
         "articulation_props": robot_cfg.spawn.articulation_props,
         "activate_contact_sensors": robot_cfg.spawn.activate_contact_sensors,
+        "l1_end_point_pos": robot_cfg.l1_end_point_pos,
+        "l1_end_point_theta": robot_cfg.l1_end_point_theta,
+        "l2_end_point_pos": robot_cfg.l2_end_point_pos,
+        "l2_end_point_theta": robot_cfg.l2_end_point_theta,
+        "l3_end_point_pos": robot_cfg.l3_end_point_pos,
+        "l3_end_point_theta": robot_cfg.l3_end_point_theta,
+        "l4_end_point_pos": robot_cfg.l4_end_point_pos,
+        "l4_end_point_theta": robot_cfg.l4_end_point_theta,
+        "l5_end_point_pos": robot_cfg.l5_end_point_pos,
+        "l5_end_point_theta": robot_cfg.l5_end_point_theta,
+        "joint_velocity_limit_rad_s": robot_cfg.joint_velocity_limit_rad_s,
+        "joint_acceleration_limit_rad_s2": robot_cfg.joint_acceleration_limit_rad_s2,
     }
     return robot_cfg
 
@@ -96,6 +110,7 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         # 16k-env broadphase requires larger aggregate pair buffers.
         self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 2048
         self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 2048
+        self.sim.physx.gpu_max_rigid_patch_count = 1024 * 256
 
         # Set Lynx as robot
         self.scene.robot = _make_lynx_robot_cfg()
@@ -113,11 +128,11 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         self.scene.object = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Object",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.3, 0.0, 0.09],
+                pos=[0.3, 0.0, 0.11],
                 rot=[1, 0, 0, 0],
             ),
             spawn=CuboidCfg(
-                size=(0.15, 0.15, 0.15),
+                size=(0.2, 0.2, 0.2),
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=4,
                     solver_velocity_iteration_count=0,
@@ -137,11 +152,11 @@ class LynxCubePushEnvCfg(PushGoalEnvCfg):
         self.scene.target = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Target",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.3, 0.0, 0.075],
+                pos=[0.3, 0.0, 0.1],
                 rot=[1, 0, 0, 0],
             ),
             spawn=CuboidCfg(
-                size=(0.15, 0.15, 0.15),
+                size=(0.2, 0.2, 0.2),
                 rigid_props=RigidBodyPropertiesCfg(
                     solver_position_iteration_count=1,
                     solver_velocity_iteration_count=0,

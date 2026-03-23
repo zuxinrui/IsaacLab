@@ -38,12 +38,13 @@ def _make_lynx_ball_in_cup_cfg() -> LynxBallInCupRobotCfg:
         l4_end_point_theta=0.0,
         l5_end_point_pos=(0.0, 0.0, 0.2),
         l5_end_point_theta=0.0,
-        cup_radius=0.04,
+        cup_radius=0.05,
         cup_height=0.08,
         ball_radius=0.02,
-        string_length=0.40,
+        string_length=0.4,
         string_radius=0.0005,
         joint_velocity_limit_rad_s=1.7453292519943295,  # 100 deg/s
+        joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
     )
 
     robot_cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(
@@ -72,6 +73,8 @@ def _make_lynx_ball_in_cup_cfg() -> LynxBallInCupRobotCfg:
         "l4_end_point_theta": robot_cfg.l4_end_point_theta,
         "l5_end_point_pos": robot_cfg.l5_end_point_pos,
         "l5_end_point_theta": robot_cfg.l5_end_point_theta,
+        "joint_velocity_limit_rad_s": robot_cfg.joint_velocity_limit_rad_s,
+        "joint_acceleration_limit_rad_s2": robot_cfg.joint_acceleration_limit_rad_s2,
         "bspline_num_segments": robot_cfg.bspline_num_segments,
         "bspline_dual_point_distance": robot_cfg.bspline_dual_point_distance,
         "tube_radiuses": robot_cfg.tube_radiuses,

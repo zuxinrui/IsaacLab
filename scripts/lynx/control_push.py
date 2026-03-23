@@ -162,6 +162,8 @@ def main():
         l4_end_point_theta=30.0,
         l5_end_point_pos=(0.0, 0.0, 0.2),
         l5_end_point_theta=0.0,
+        joint_velocity_limit_rad_s=1.7453292519943295,  # 100 deg/s
+        joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
     )
     robot_cfg.spawn.func = LynxUsdConstructor.spawn
     robot_cfg.spawn.robot_cfg = {
@@ -188,6 +190,8 @@ def main():
         "l4_end_point_theta": robot_cfg.l4_end_point_theta,
         "l5_end_point_pos": robot_cfg.l5_end_point_pos,
         "l5_end_point_theta": robot_cfg.l5_end_point_theta,
+        "joint_velocity_limit_rad_s": robot_cfg.joint_velocity_limit_rad_s,
+        "joint_acceleration_limit_rad_s2": robot_cfg.joint_acceleration_limit_rad_s2,
     }
     
     # Wrap in Articulation
@@ -197,11 +201,11 @@ def main():
     cube_cfg = RigidObjectCfg(
         prim_path="/World/Object",
         init_state=RigidObjectCfg.InitialStateCfg(
-            pos=(0.3, 0.0, 0.09),
+            pos=(0.3, 0.0, 0.11),
             rot=(1.0, 0.0, 0.0, 0.0),
         ),
         spawn=CuboidCfg(
-            size=(0.15, 0.15, 0.15),
+            size=(0.2, 0.2, 0.2),
             rigid_props=RigidBodyPropertiesCfg(
                 solver_position_iteration_count=4,
                 solver_velocity_iteration_count=0,
@@ -221,11 +225,11 @@ def main():
     target_cfg = RigidObjectCfg(
         prim_path="/World/Target",
         init_state=RigidObjectCfg.InitialStateCfg(
-            pos=(0.3, 0.0, 0.075),
+            pos=(0.3, 0.0, 0.1),
             rot=(1.0, 0.0, 0.0, 0.0),
         ),
         spawn=CuboidCfg(
-            size=(0.15, 0.15, 0.15),
+            size=(0.2, 0.2, 0.2),
             rigid_props=RigidBodyPropertiesCfg(
                 solver_position_iteration_count=1,
                 solver_velocity_iteration_count=0,

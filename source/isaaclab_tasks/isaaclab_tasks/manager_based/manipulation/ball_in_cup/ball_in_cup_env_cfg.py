@@ -230,7 +230,7 @@ class RewardsCfg:
             "ball_cfg": SceneEntityCfg("robot", body_names=["ball"]),
             "h_rim": 0.08,
             "dh": 1.0,
-            "sigma_d": 0.03,
+            "sigma_d": 0.035,
             "upright_cos_min": 0.5,
         },
     )
@@ -261,7 +261,7 @@ class RewardsCfg:
             "ball_cfg": SceneEntityCfg("robot", body_names=["ball"]),
             "h_low": 0.01,
             "h_high": 0.09,
-            "d_inner": 0.3,
+            "d_inner": 0.03,
             "rel_speed_max": 0.5,
             "upright_cos_min": 0.75,
         },
@@ -271,15 +271,15 @@ class RewardsCfg:
     action_magnitude = RewTerm(func=mdp.regularization_penalty, weight=0.0001)
 
     # Penalty: Joint height
-    joint_height_penalty = RewTerm(
-        func=mdp.joint_height_penalty,
-        weight=-0.1,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["link_3", "link_4", "link_5", "link_6", "ee_cylinder"]),
-            "height_threshold": 0.1,
-            "soft_margin": 0.05,
-        },
-    )
+    # joint_height_penalty = RewTerm(
+    #     func=mdp.joint_height_penalty,
+    #     weight=-0.2,
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names=["link_3", "link_4", "link_5", "link_6", "ee_cylinder"]),
+    #         "height_threshold": 0.1,
+    #         "soft_margin": 0.05,
+    #     },
+    # )
 
     # Penalty: Undesired robot contacts
     # undesired_contacts = RewTerm(
