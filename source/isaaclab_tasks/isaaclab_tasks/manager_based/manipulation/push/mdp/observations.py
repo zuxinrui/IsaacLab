@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
-from isaaclab.assets import Articulation, RigidObject
+from isaaclab.assets import Articulation, DeformableObject, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import FrameTransformer
 from isaaclab.markers import VisualizationMarkers
@@ -111,6 +111,45 @@ def target_orientation_in_world_frame(
     """The orientation of the target as a quaternion (w, x, y, z) in the world frame."""
     target: RigidObject = env.scene[target_cfg.name]
     return target.data.root_quat_w
+
+
+def deformable_object_position_in_robot_root_frame(
+    env: ManagerBasedRLEnv,
+    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+) -> torch.Tensor:
+    """The position of the deformable object center (mean of nodes) in the robot's root frame."""
+    robot: RigidObject = env.scene[robot_cfg.name]
+    obj: DeformableObject = env.scene[object_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)  # (num_envs, 3)
+    object_pos_b, _ = subtract_frame_transforms(robot.data.root_pos_w, robot.data.root_quat_w, object_pos_w)
+    return object_pos_b
+
+
+def deformable_ee_to_object_position(
+    env: ManagerBasedRLEnv,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+) -> torch.Tensor:
+    """The vector from the end-effector to the deformable object center in the world frame."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)  # (num_envs, 3)
+    ee_pos_w = ee_frame.data.target_pos_w[..., 0, :]
+    return object_pos_w - ee_pos_w
+
+
+def deformable_object_to_target_position(
+    env: ManagerBasedRLEnv,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    target_cfg: SceneEntityCfg = SceneEntityCfg("target"),
+) -> torch.Tensor:
+    """The vector from the deformable object center to the target in the world frame."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    target: RigidObject = env.scene[target_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)  # (num_envs, 3)
+    target_pos_w = target.data.root_pos_w[:, :3]
+    return target_pos_w - object_pos_w
 
 
 def visualize_object_orientation(

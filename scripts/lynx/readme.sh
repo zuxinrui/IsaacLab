@@ -50,6 +50,7 @@ python scripts/lynx/train.py --task=Isaac-Push-Cube-Lynx-v0 --num_envs 32 --head
 python scripts/lynx/train.py --task=Isaac-Push-Cube-Lynx-ObsDelay-v0 --num_envs 32 --headless
 python scripts/lynx/train.py --task=Isaac-Ball-In-Cup-Lynx-v0 --num_envs 32 --headless
 python scripts/lynx/train.py --task=Isaac-Ball-In-Cup-Lynx-v1 --num_envs 32 --headless
+python scripts/lynx/train.py --task=Isaac-Push-DeformableCube-Lynx-v0 --num_envs 16 --headless
 
 # distributed training:
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/lynx/train.py --task=Isaac-Push-Cube-Lynx-v0 --distributed --headless --num_envs 16384
@@ -63,7 +64,7 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-ObsDelay-v0 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-23_15-10-11 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-23_15-10-11/model_1999.pt
 
-python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v0 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-19_16-15-54 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-19_16-15-54/model_400.pt
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v0 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-23_23-10-54 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-23_23-10-54/model_500.pt
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v1 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-20_01-52-04 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-20_01-52-04/model_550.pt
 

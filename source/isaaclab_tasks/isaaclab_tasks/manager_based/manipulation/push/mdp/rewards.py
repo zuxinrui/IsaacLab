@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from isaaclab.assets import Articulation, RigidObject
+from isaaclab.assets import Articulation, DeformableObject, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor, FrameTransformer
 
@@ -389,3 +389,88 @@ def object_ee_distance_raw(
 
     # Distance of the end-effector to the object: (num_envs,)
     return torch.norm(object_pos_w - ee_w, dim=1)
+
+
+# ---------------------------------------------------------------------------
+# Deformable-object variants (use nodal_pos_w.mean() as the object center)
+# ---------------------------------------------------------------------------
+
+def deformable_object_ee_distance(
+    env: ManagerBasedRLEnv,
+    std: float,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+) -> torch.Tensor:
+    """Reward for moving the end-effector close to the deformable object center."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    # One-time diagnostic: log the SoftBodyView instance count
+    if not getattr(env, "_deformable_count_logged", False):
+        count = obj.root_physx_view.count
+        print(
+            f"[DeformableDiag] SoftBodyView.count={count}  "
+            f"num_instances={obj.num_instances}  "
+            f"expected={env.num_envs}  "
+            f"{'OK' if count == env.num_envs else 'MISMATCH — only env_0 registered!'}"
+        )
+        env._deformable_count_logged = True  # type: ignore[attr-defined]
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)
+    ee_w = ee_frame.data.target_pos_w[..., 0, :]
+    dist = torch.norm(object_pos_w - ee_w, dim=1)
+    return 1 - torch.tanh(dist / std)
+
+
+def deformable_object_ee_distance_raw(
+    env: ManagerBasedRLEnv,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+) -> torch.Tensor:
+    """Raw distance from end-effector to deformable object center."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)
+    ee_w = ee_frame.data.target_pos_w[..., 0, :]
+    return torch.norm(object_pos_w - ee_w, dim=1)
+
+
+def deformable_object_goal_distance(
+    env: ManagerBasedRLEnv,
+    std: float,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    target_cfg: SceneEntityCfg = SceneEntityCfg("target"),
+) -> torch.Tensor:
+    """Reward for pushing the deformable object center close to the target (XY plane)."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    target: RigidObject = env.scene[target_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)
+    target_pos_w = target.data.root_pos_w[:, :3]
+    distance = torch.norm(object_pos_w[:, :2] - target_pos_w[:, :2], dim=1)
+    return 1 - torch.tanh(distance / std)
+
+
+def deformable_object_goal_distance_raw(
+    env: ManagerBasedRLEnv,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    target_cfg: SceneEntityCfg = SceneEntityCfg("target"),
+) -> torch.Tensor:
+    """Raw 3-D distance from deformable object center to target."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    target: RigidObject = env.scene[target_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)
+    target_pos_w = target.data.root_pos_w[:, :3]
+    return torch.norm(object_pos_w - target_pos_w, dim=1)
+
+
+def deformable_object_at_goal(
+    env: ManagerBasedRLEnv,
+    pos_threshold: float = 0.05,
+    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
+    target_cfg: SceneEntityCfg = SceneEntityCfg("target"),
+) -> torch.Tensor:
+    """Success bonus when the deformable object center is within pos_threshold of the target (XY)."""
+    obj: DeformableObject = env.scene[object_cfg.name]
+    target: RigidObject = env.scene[target_cfg.name]
+    object_pos_w = obj.data.nodal_pos_w.mean(dim=1)
+    target_pos_w = target.data.root_pos_w[:, :3]
+    pos_distance = torch.norm(object_pos_w[:, :2] - target_pos_w[:, :2], dim=1)
+    return (pos_distance < pos_threshold).float()

@@ -8,7 +8,6 @@
 import argparse
 import torch
 import numpy as np
-import re
 
 from isaaclab.app import AppLauncher
 
@@ -30,37 +29,15 @@ from isaaclab_assets.robots.lynx_ball_in_cup import LynxBallInCupRobotCfg, LynxB
 
 class LynxInteractiveGui:
     """GUI window for controlling robot joints."""
-    def __init__(self, robot: Articulation):
+    def __init__(self, robot: Articulation, num_controlled_joints: int):
         self.robot = robot
-        self.num_joints = robot.num_joints
         self.joint_names = robot.data.joint_names
-        
-        # Identify actuated joints (those with stiffness > 0)
-        self.actuated_joint_indices = []
-        
-        # Heuristic: Lynx arm joints are named joint_1 to joint_6
-        # We can also check the actuator config
-        for i in range(self.num_joints):
-            joint_name = self.joint_names[i]
-            is_actuated = False
-            
-            # Check if it matches any actuator expression
-            for actuator_name, actuator_cfg in robot.cfg.actuators.items():
-                for expr in actuator_cfg.joint_names_expr:
-                    if re.search(expr, joint_name):
-                        # Check stiffness
-                        stiffness = actuator_cfg.stiffness
-                        if isinstance(stiffness, dict):
-                            val = stiffness.get(joint_name, 0.0)
-                            if val > 0:
-                                is_actuated = True
-                        elif stiffness is not None and stiffness > 0:
-                            is_actuated = True
-                if is_actuated:
-                    break
-            
-            if is_actuated:
-                self.actuated_joint_indices.append(i)
+
+        # Only show sliders for the arm joints: joint_1 .. joint_{num_controlled_joints}
+        controlled_names = {f"joint_{i+1}" for i in range(num_controlled_joints)}
+        self.actuated_joint_indices = [
+            i for i, name in enumerate(self.joint_names) if name in controlled_names
+        ]
 
         # Create a window
         self.window = ui.Window(
@@ -187,8 +164,8 @@ def main():
     # Play the simulator
     sim.reset()
     
-    # Initialize GUI
-    gui = LynxInteractiveGui(robot)
+    # Initialize GUI — only show sliders for the arm joints
+    gui = LynxInteractiveGui(robot, num_controlled_joints=robot_cfg.num_joints)
 
     # Simulate
     while simulation_app.is_running():

@@ -713,6 +713,14 @@ class SimulationContext(_SimulationContext):
         self.carb_settings.set_bool("/physics/visualizationSimulationOutput", False)
         # set fabric enabled flag
         self.carb_settings.set_bool("/physics/fabricEnabled", self.cfg.use_fabric)
+        # When Fabric is disabled, also disable GPU interop between PhysX GPU and Fabric.
+        # The Fabric C++ plugin (omni.physx.fabric.plugin) runs GPU kernels for its interop
+        # independently of the /physics/fabricEnabled flag.  With physics objects outside the
+        # GridCloner env hierarchy (e.g. FEM deformable bodies), the plugin allocates only 1
+        # GPU slot per such object while the GPU kernels access N per-env slots, causing CUDA
+        # device-side asserts.  Disabling GPU interop prevents those kernels from running.
+        if not self.cfg.use_fabric:
+            self.carb_settings.set_bool("/physics/fabricUseGPUInterop", False)
 
     def _apply_render_settings_from_cfg(self):  # noqa: C901
         """Sets rtx settings specified in the RenderCfg."""

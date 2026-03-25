@@ -77,7 +77,7 @@ class LynxRobotCfg(ArticulationCfg):
     joint_position_limit_deg: float = 180.0
     # joint_velocity_limit_rad_s: float = 0.3490658503988659  # 20 deg/s  1.7453292519943295 100 deg/s  50 deg/s: 0.8726646259971648
     # 100 deg / s:
-    joint_velocity_limit_rad_s: float = 0.3490658503988659  # 100 deg/s / 20 deg/s  / 50 deg/s
+    joint_velocity_limit_rad_s: float = 1.7453292519943295  # 100 deg/s / 20 deg/s  / 50 deg/s
     joint_acceleration_limit_rad_s2: float = 1.7453292519943295  # 100 deg/s^2
 
     # NOTE: ImplicitActuatorCfg is the authoritative source for stiffness/damping.
@@ -86,21 +86,21 @@ class LynxRobotCfg(ArticulationCfg):
         "lynx_arm_mega": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-2]"],
             effort_limit_sim=130.0,
-            velocity_limit_sim=joint_velocity_limit_rad_s,
+            velocity_limit_sim=None,  # Will be set in __post_init__
             stiffness=800.0,
             damping=75.0,
         ),
         "lynx_arm_standard": ImplicitActuatorCfg(
             joint_names_expr=["joint_[3-4]"],
             effort_limit_sim=54.0,
-            velocity_limit_sim=joint_velocity_limit_rad_s,
+            velocity_limit_sim=None,  # Will be set in __post_init__
             stiffness=800.0,
             damping=75.0,
         ),
         "lynx_arm_lite": ImplicitActuatorCfg(
             joint_names_expr=["joint_[5-6]"],
             effort_limit_sim=19.0,
-            velocity_limit_sim=joint_velocity_limit_rad_s,
+            velocity_limit_sim=None,  # Will be set in __post_init__
             stiffness=800.0,
             damping=75.0,
         ),
@@ -119,6 +119,11 @@ class LynxRobotCfg(ArticulationCfg):
 
     def __post_init__(self):
         """Post-initialization to filter actuators and init_state based on num_joints."""
+        # Update actuator velocity limits from the main config
+        for actuator in self.actuators.values():
+            if actuator.velocity_limit_sim is None:
+                actuator.velocity_limit_sim = self.joint_velocity_limit_rad_s
+
         # Filter actuators
         new_actuators = {}
         for name, actuator in self.actuators.items():
@@ -370,9 +375,9 @@ class LynxUsdConstructor:
             joint_physx_api.CreateJointFrictionAttr(0.0)
         if actuator_cfg.velocity_limit_sim is not None:
             if joint_physx_api.GetMaxJointVelocityAttr().HasAuthoredValueOpinion():
-                joint_physx_api.GetMaxJointVelocityAttr().Set(self.cfg.joint_velocity_limit_rad_s)
+                joint_physx_api.GetMaxJointVelocityAttr().Set(actuator_cfg.velocity_limit_sim)
             else:
-                joint_physx_api.CreateMaxJointVelocityAttr(self.cfg.joint_velocity_limit_rad_s)
+                joint_physx_api.CreateMaxJointVelocityAttr(actuator_cfg.velocity_limit_sim)
 
         # Set acceleration limit when supported by the installed PhysX schema.
         # Target: 100 deg/s^2 == 1.7453292519943295 rad/s^2.

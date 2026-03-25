@@ -151,7 +151,7 @@ def main():
         num_joints=6,
         genotype_tube=[0, 1, 0, 1, 0],
         genotype_joints=1,
-        rotation_angles=[180.0, 60.0, 60.0, -180.0, 60.0, 90.0],
+        rotation_angles=[180.0, 0.0, 0.0, -180.0, 0.0, 90.0],
         l1_end_point_pos=(0.0, 0.0, 0.2),
         l1_end_point_theta=0.0,
         l2_end_point_pos=(0.0, 0.05, 0.2),
@@ -162,7 +162,7 @@ def main():
         l4_end_point_theta=30.0,
         l5_end_point_pos=(0.0, 0.0, 0.2),
         l5_end_point_theta=0.0,
-        joint_velocity_limit_rad_s=1.7453292519943295,  # 100 deg/s
+        joint_velocity_limit_rad_s=1.7453292519943295,  # 20 deg/s: 0.3490658503988659
         joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
     )
     robot_cfg.spawn.func = LynxUsdConstructor.spawn

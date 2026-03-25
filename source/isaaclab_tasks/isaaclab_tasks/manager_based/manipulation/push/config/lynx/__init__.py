@@ -58,3 +58,29 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+##
+# Deformable (jelly) cube push variant
+##
+
+gym.register(
+    id="Isaac-Push-DeformableCube-Lynx-v0",
+    entry_point=f"{__name__}.joint_pos_deformable_env_cfg:LynxDeformablePushEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.joint_pos_deformable_env_cfg:LynxDeformableCubePushEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PushCubePPORunnerCfg",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+    disable_env_checker=True,
+)
+
+gym.register(
+    id="Isaac-Push-DeformableCube-Lynx-Play-v0",
+    entry_point=f"{__name__}.joint_pos_deformable_env_cfg:LynxDeformablePushEnv",
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.joint_pos_deformable_env_cfg:LynxDeformableCubePushEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PushCubePPORunnerCfg",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
+    },
+    disable_env_checker=True,
+)
