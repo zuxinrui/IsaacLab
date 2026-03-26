@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This script provides an interactive GUI to control the Lynx robot for the Push task."""
+"""This script provides an interactive GUI to control the Lynx robot for the Deformable Push task."""
 
 import argparse
 import torch
@@ -14,9 +14,9 @@ import os
 from isaaclab.app import AppLauncher
 
 # add argparser
-parser = argparse.ArgumentParser(description="Interactive Joint Control for Lynx Push Task.")
+parser = argparse.ArgumentParser(description="Interactive Joint Control for Lynx Deformable Push Task.")
 parser.add_argument("--record", action="store_true", default=False, help="Record video of the simulation.")
-parser.add_argument("--video_path", type=str, default="./videos/control_push.mp4", help="Path to save the recorded video.")
+parser.add_argument("--video_path", type=str, default="./videos/control_deformable_push.mp4", help="Path to save the recorded video.")
 parser.add_argument("--video_fps", type=int, default=30, help="FPS of the recorded video.")
 parser.add_argument("--video_resolution", type=int, nargs=2, default=[1280, 720], help="Resolution of the recorded video (width height).")
 # append AppLauncher cli args
@@ -33,9 +33,10 @@ simulation_app = app_launcher.app
 """Rest of the imports."""
 import omni.ui as ui
 import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation, RigidObject, RigidObjectCfg
+from isaaclab.assets import Articulation, DeformableObject, DeformableObjectCfg, RigidObject, RigidObjectCfg
 from isaaclab.sim import CuboidCfg, MeshCuboidCfg
-from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
+from isaaclab.sim.schemas.schemas_cfg import DeformableBodyPropertiesCfg, RigidBodyPropertiesCfg
+from isaaclab.sim.spawners.materials.physics_materials_cfg import DeformableBodyMaterialCfg
 from isaaclab_assets.robots.lynx_constructor import LynxRobotCfg, LynxUsdConstructor
 
 class LynxInteractiveGui:
@@ -44,14 +45,14 @@ class LynxInteractiveGui:
         self.robot = robot
         self.num_joints = robot.num_joints
         self.joint_names = robot.data.joint_names
-        
+
         # Identify actuated joints (those with stiffness > 0)
         self.actuated_joint_indices = []
-        
+
         for i in range(self.num_joints):
             joint_name = self.joint_names[i]
             is_actuated = False
-            
+
             # Check if it matches any actuator expression
             for actuator_name, actuator_cfg in robot.cfg.actuators.items():
                 for expr in actuator_cfg.joint_names_expr:
@@ -66,7 +67,7 @@ class LynxInteractiveGui:
                             is_actuated = True
                 if is_actuated:
                     break
-            
+
             if is_actuated:
                 self.actuated_joint_indices.append(i)
 
@@ -78,10 +79,10 @@ class LynxInteractiveGui:
             dockPreference=ui.DockPreference.RIGHT_BOTTOM
         )
         self.window.deferred_dock_in("Property")
-        
+
         # Target positions (initialized to current)
         self.target_joint_pos = robot.data.joint_pos[0].clone()
-        
+
         with self.window.frame:
             with ui.VStack(spacing=5):
                 ui.Label("Adjust Actuated Joint Positions (Radians)", alignment=ui.Alignment.CENTER)
@@ -91,21 +92,21 @@ class LynxInteractiveGui:
                     for idx, slider in self.sliders.items():
                         slider.model.set_value(0.0)
                         self.target_joint_pos[idx] = 0.0
-                
+
                 ui.Button("Reset Actuated to Zero", clicked_fn=on_reset)
                 ui.Spacer(height=10)
-                
+
                 self.sliders = {}
                 for i in self.actuated_joint_indices:
                     with ui.HStack():
                         ui.Label(f"{self.joint_names[i]}:", width=120)
                         slider = ui.FloatSlider(min=-3.14, max=3.14)
                         slider.model.set_value(float(self.target_joint_pos[i]))
-                        
+
                         # Update target pos when slider changes
                         def on_change(model, idx=i):
                             self.target_joint_pos[idx] = model.get_value_as_float()
-                        
+
                         slider.model.add_value_changed_fn(on_change)
                         self.sliders[i] = slider
 
@@ -115,7 +116,16 @@ class LynxInteractiveGui:
 def main():
     """Main function."""
     # Load kit helper
-    sim_cfg = sim_utils.SimulationCfg(device="cuda:0", gravity=(0.0, 0.0, -9.81))
+    sim_cfg = sim_utils.SimulationCfg(
+        device="cuda:0",
+        gravity=(0.0, 0.0, -9.81),
+        physx=sim_utils.PhysxCfg(
+            bounce_threshold_velocity=0.2,
+            gpu_found_lost_aggregate_pairs_capacity=1024 * 2048,
+            gpu_total_aggregate_pairs_capacity=1024 * 2048,
+            gpu_max_rigid_patch_count=1024 * 256,
+        ),
+    )
     sim = sim_utils.SimulationContext(sim_cfg)
 
     # Set main camera
@@ -126,7 +136,7 @@ def main():
     light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
     light_cfg.func("/World/Light", light_cfg)
 
-    # Table (from push_env_cfg.py)
+    # Table
     table_cfg = sim_utils.MeshCuboidCfg(
         size=(1.0, 0.8, 0.018),
         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.55, 0.5, 0.2)),
@@ -153,26 +163,36 @@ def main():
     plane_cfg = sim_utils.GroundPlaneCfg()
     plane_cfg.func("/World/defaultGroundPlane", plane_cfg, translation=(0.0, 0.0, -0.6 - 0.018))
 
-    # Create Lynx robot configuration (from joint_pos_env_cfg.py)
+    # Create Lynx robot configuration (same as deformable_push_direct_env)
     robot_cfg = LynxRobotCfg(
         prim_path="/World/Robot",
         num_joints=6,
         genotype_tube=[0, 1, 0, 1, 0],
         genotype_joints=1,
-        rotation_angles=[180.0, 0.0, 0.0, -180.0, 0.0, 90.0],
+        rotation_angles=[180.0, 0.0, 0.0, -180.0, 0.0, 0.0],
         l1_end_point_pos=(0.0, 0.0, 0.2),
         l1_end_point_theta=0.0,
-        l2_end_point_pos=(0.0, 0.05, 0.2),
-        l2_end_point_theta=30.0,
+        l2_end_point_pos=(0.0, 0.0, 0.2805),
+        l2_end_point_theta=0.0,
         l3_end_point_pos=(0.0, 0.0, 0.2),
         l3_end_point_theta=0.0,
-        l4_end_point_pos=(0.0, 0.05, 0.2),
-        l4_end_point_theta=30.0,
+        l4_end_point_pos=(0.0, 0.0, 0.2805),
+        l4_end_point_theta=0.0,
         l5_end_point_pos=(0.0, 0.0, 0.2),
         l5_end_point_theta=0.0,
-        joint_velocity_limit_rad_s=1.7453292519943295,  # 20 deg/s: 0.3490658503988659
+        joint_velocity_limit_rad_s=0.3490658503988659,  # 20 deg/s
         joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
     )
+    robot_cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(
+        enabled_self_collisions=False,
+        solver_position_iteration_count=4,
+        solver_velocity_iteration_count=0,
+    )
+    robot_cfg.spawn.rigid_props = sim_utils.RigidBodyPropertiesCfg(
+        disable_gravity=False,
+        max_depenetration_velocity=5.0,
+    )
+    robot_cfg.spawn.activate_contact_sensors = True
     robot_cfg.spawn.func = LynxUsdConstructor.spawn
     robot_cfg.spawn.robot_cfg = {
         "genotype_tube": robot_cfg.genotype_tube,
@@ -201,35 +221,36 @@ def main():
         "joint_velocity_limit_rad_s": robot_cfg.joint_velocity_limit_rad_s,
         "joint_acceleration_limit_rad_s2": robot_cfg.joint_acceleration_limit_rad_s2,
     }
-    
+
     # Wrap in Articulation
     robot = Articulation(robot_cfg)
 
-    # Create Cube (from joint_pos_env_cfg.py)
-    cube_cfg = RigidObjectCfg(
+    # Create Deformable Cube (matching deformable_push_direct_env)
+    cube_cfg = DeformableObjectCfg(
         prim_path="/World/Object",
-        init_state=RigidObjectCfg.InitialStateCfg(
-            pos=(0.3, 0.0, 0.11),
-            rot=(1.0, 0.0, 0.0, 0.0),
-        ),
-        spawn=CuboidCfg(
+        spawn=sim_utils.MeshCuboidCfg(
             size=(0.2, 0.2, 0.2),
-            rigid_props=RigidBodyPropertiesCfg(
-                solver_position_iteration_count=4,
-                solver_velocity_iteration_count=0,
-                max_angular_velocity=1000.0,
-                max_linear_velocity=1000.0,
-                max_depenetration_velocity=5.0,
-                disable_gravity=False,
+            deformable_props=DeformableBodyPropertiesCfg(
+                self_collision=False,
+                solver_position_iteration_count=16,
             ),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2)),
+            physics_material=DeformableBodyMaterialCfg(
+                youngs_modulus=5000.0,
+                poissons_ratio=0.49,
+                dynamic_friction=0.5,
+                elasticity_damping=0.002,
+                damping_scale=0.3,
+            ),
+            visual_material=sim_utils.PreviewSurfaceCfg(
+                diffuse_color=(0.2, 0.8, 0.4),
+            ),
         ),
+        init_state=DeformableObjectCfg.InitialStateCfg(pos=(0.3, 0.0, 0.11)),
+        debug_vis=False,
     )
-    cube = RigidObject(cube_cfg)
+    cube = DeformableObject(cube_cfg)
 
-    # Create Target (from joint_pos_env_cfg.py)
+    # Create Target (rigid, kinematic, visual only)
     target_cfg = RigidObjectCfg(
         prim_path="/World/Target",
         init_state=RigidObjectCfg.InitialStateCfg(
@@ -269,10 +290,12 @@ def main():
         import omni.replicator.core as rep
 
         video_w, video_h = args_cli.video_resolution
+        # Create render product from the default viewport camera
         rp = rep.create.render_product("/OmniverseKit_Persp", (video_w, video_h))
         rgb_annotator = rep.AnnotatorRegistry.get_annotator("rgb")
         rgb_annotator.attach([rp])
 
+        # Ensure output directory exists
         os.makedirs(os.path.dirname(os.path.abspath(args_cli.video_path)), exist_ok=True)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         video_writer = cv2.VideoWriter(args_cli.video_path, fourcc, args_cli.video_fps, (video_w, video_h))
@@ -317,6 +340,7 @@ def main():
             if video_writer is not None:
                 frame = rgb_annotator.get_data()
                 if frame is not None and frame.size > 0:
+                    # frame is RGBA (H, W, 4), convert to BGR for OpenCV
                     frame_bgr = cv2.cvtColor(frame[:, :, :3], cv2.COLOR_RGB2BGR)
                     video_writer.write(frame_bgr)
     finally:

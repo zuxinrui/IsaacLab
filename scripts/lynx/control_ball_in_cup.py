@@ -8,15 +8,23 @@
 import argparse
 import torch
 import numpy as np
+import os
 
 from isaaclab.app import AppLauncher
 
 # add argparser
 parser = argparse.ArgumentParser(description="Interactive Joint Control for Lynx Ball-in-a-Cup.")
+parser.add_argument("--record", action="store_true", default=False, help="Record video of the simulation.")
+parser.add_argument("--video_path", type=str, default="./videos/control_ball_in_cup.mp4", help="Path to save the recorded video.")
+parser.add_argument("--video_fps", type=int, default=30, help="FPS of the recorded video.")
+parser.add_argument("--video_resolution", type=int, nargs=2, default=[1280, 720], help="Resolution of the recorded video (width height).")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
+# enable cameras if recording
+if args_cli.record:
+    args_cli.enable_cameras = True
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
@@ -163,26 +171,70 @@ def main():
 
     # Play the simulator
     sim.reset()
-    
+
     # Initialize GUI — only show sliders for the arm joints
     gui = LynxInteractiveGui(robot, num_controlled_joints=robot_cfg.num_joints)
 
+    # Setup video recording
+    video_writer = None
+    if args_cli.record:
+        import cv2
+        import omni.replicator.core as rep
+
+        video_w, video_h = args_cli.video_resolution
+        rp = rep.create.render_product("/OmniverseKit_Persp", (video_w, video_h))
+        rgb_annotator = rep.AnnotatorRegistry.get_annotator("rgb")
+        rgb_annotator.attach([rp])
+
+        os.makedirs(os.path.dirname(os.path.abspath(args_cli.video_path)), exist_ok=True)
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        video_writer = cv2.VideoWriter(args_cli.video_path, fourcc, args_cli.video_fps, (video_w, video_h))
+        print(f"[INFO]: Recording video to {args_cli.video_path} ({video_w}x{video_h} @ {args_cli.video_fps} fps)")
+
+    # Register Ctrl+C handler to save video on interrupt
+    import signal
+
+    def _on_sigint(sig, frame):
+        nonlocal video_writer
+        if video_writer is not None:
+            video_writer.release()
+            video_writer = None
+            print(f"\n[INFO]: Video saved to {args_cli.video_path}")
+        print("[INFO]: Simulation interrupted.")
+        simulation_app.close()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGINT, _on_sigint)
+
     # Simulate
-    while simulation_app.is_running():
-        # Get target from GUI
-        target_pos = gui.get_target_pos().unsqueeze(0) # (1, num_joints)
-        
-        # Apply joint positions directly
-        robot.set_joint_position_target(target_pos)
-        
-        # Write data to sim
-        robot.write_data_to_sim()
-        
-        # perform step
-        sim.step(render=True)
-        
-        # Update robot data
-        robot.update(sim.get_physics_dt())
+    try:
+        while simulation_app.is_running():
+            # Get target from GUI
+            target_pos = gui.get_target_pos().unsqueeze(0) # (1, num_joints)
+
+            # Apply joint positions directly
+            robot.set_joint_position_target(target_pos)
+
+            # Write data to sim
+            robot.write_data_to_sim()
+
+            # perform step
+            sim.step(render=True)
+
+            # Update robot data
+            robot.update(sim.get_physics_dt())
+
+            # Capture frame for video
+            if video_writer is not None:
+                frame = rgb_annotator.get_data()
+                if frame is not None and frame.size > 0:
+                    frame_bgr = cv2.cvtColor(frame[:, :, :3], cv2.COLOR_RGB2BGR)
+                    video_writer.write(frame_bgr)
+    finally:
+        if video_writer is not None:
+            video_writer.release()
+            video_writer = None
+            print(f"[INFO]: Video saved to {args_cli.video_path}")
 
     print("[INFO]: Simulation finished.")
 

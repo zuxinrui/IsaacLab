@@ -45,6 +45,7 @@ simulation_app = app_launcher.app
 import torch
 import isaaclab.sim as sim_utils
 import isaaclab.utils.math as math_utils
+from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import Articulation, DeformableObject, DeformableObjectCfg, RigidObject, RigidObjectCfg
 from isaaclab.sim import SimulationContext
 from isaaclab.sim.schemas.schemas_cfg import DeformableBodyPropertiesCfg, RigidBodyPropertiesCfg
@@ -181,7 +182,7 @@ def design_scene(num_envs: int, spacing: float):
             joint_pos={"joint_[1-6]": 0.0},
         ),
         actuators={
-            "lynx_arm": sim_utils.ImplicitActuatorCfg(
+            "lynx_arm": ImplicitActuatorCfg(
                 joint_names_expr=["joint_[1-6]"],
                 stiffness=800.0,
                 damping=75.0,

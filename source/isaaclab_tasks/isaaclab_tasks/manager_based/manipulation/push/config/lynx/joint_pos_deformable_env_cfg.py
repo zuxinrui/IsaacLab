@@ -200,7 +200,7 @@ class DeformablePushGoalRewardsCfg:
     success_bonus = RewTerm(
         func=mdp.deformable_object_at_goal,
         params={
-            "pos_threshold": 0.05,
+            "pos_threshold": 0.03,
             "object_cfg": SceneEntityCfg("object"),
             "target_cfg": SceneEntityCfg("target"),
         },
