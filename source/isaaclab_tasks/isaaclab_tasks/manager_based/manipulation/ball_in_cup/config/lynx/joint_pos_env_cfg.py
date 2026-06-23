@@ -12,6 +12,8 @@ from isaaclab_assets.robots.lynx_ball_in_cup import LynxBallInCupConstructor, Ly
 from isaaclab_tasks.manager_based.manipulation.ball_in_cup.ball_in_cup_env_cfg import (
     BallInCupEnvCfg,
     BallInCupEnvCfg_PLAY,
+    BallInCupEnvCfg_V0Legacy,
+    BallInCupEnvCfg_V0Legacy_PLAY,
     BallInCupEnvCfg_V1,
     BallInCupEnvCfg_V1_PLAY,
     BallInCupEnvCfg_V2,
@@ -20,8 +22,14 @@ from isaaclab_tasks.manager_based.manipulation.ball_in_cup.ball_in_cup_env_cfg i
 from isaaclab_tasks.manager_based.manipulation.ball_in_cup import mdp
 
 
-def _make_lynx_ball_in_cup_cfg() -> LynxBallInCupRobotCfg:
-    """Create and configure the Lynx ball-in-a-cup robot configuration."""
+def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRobotCfg:
+    """Create and configure the Lynx ball-in-a-cup robot configuration.
+
+    ``string_num_segments`` defaults to the current 10-segment rope. Pass 12 to
+    reproduce the legacy geometry that the pre-56783a8b 106-dim checkpoints were
+    trained against (those checkpoints expect 45 joint DOFs: 6 arm + 12*3 string
+    spherical + 3 ball spherical).
+    """
     robot_cfg = LynxBallInCupRobotCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
         num_joints=6,
@@ -43,6 +51,7 @@ def _make_lynx_ball_in_cup_cfg() -> LynxBallInCupRobotCfg:
         ball_radius=0.02,
         string_length=0.4,
         string_radius=0.0005,
+        string_num_segments=string_num_segments,
         joint_velocity_limit_rad_s=1.7453292519943295,  # 100 deg/s
         joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
     )
@@ -87,6 +96,7 @@ def _make_lynx_ball_in_cup_cfg() -> LynxBallInCupRobotCfg:
         "ball_radius": robot_cfg.ball_radius,
         "string_length": robot_cfg.string_length,
         "string_radius": robot_cfg.string_radius,
+        "string_num_segments": robot_cfg.string_num_segments,
         "collision_mode": robot_cfg.collision_mode,
         "articulation_props": robot_cfg.spawn.articulation_props,
         "rigid_props": robot_cfg.spawn.rigid_props,
@@ -263,6 +273,64 @@ class LynxBallInCupEnvCfg_V2_PLAY(BallInCupEnvCfg_V2_PLAY):
         self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 256
 
         self.scene.robot = _make_lynx_ball_in_cup_cfg()
+
+        self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
+            asset_name="robot",
+            joint_names=["joint_[1-6]"],
+            scale=0.1745,
+            clip={".*": (-1.0, 1.0)},
+        )
+
+
+@configclass
+class LynxBallInCupEnvCfg_V0Legacy(BallInCupEnvCfg_V0Legacy):
+    """Lynx ball-in-a-cup config with the legacy 106-dim observation space.
+
+    Intended purely for loading and visualizing the earliest PPO checkpoints that
+    were trained before the observation slimming (commit 56783a8b) and before the
+    string was shortened from 12 to 10 segments (commit 5467554a).
+
+    Total obs: joint_pos_rel(45) + joint_vel_rel(45) + cup_ball_features(10) +
+    last_action(6) = 106.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.sim.dt = 1.0 / 60.0
+        self.decimation = 12
+        self.sim.render_interval = 1
+
+        self.sim.physx.bounce_threshold_velocity = 0.2
+        self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 2048
+        self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 2048
+
+        self.scene.robot = _make_lynx_ball_in_cup_cfg(string_num_segments=12)
+
+        self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
+            asset_name="robot",
+            joint_names=["joint_[1-6]"],
+            scale=0.1745,
+            clip={".*": (-1.0, 1.0)},
+        )
+
+
+@configclass
+class LynxBallInCupEnvCfg_V0Legacy_PLAY(BallInCupEnvCfg_V0Legacy_PLAY):
+    """Play-time Lynx ball-in-a-cup config with the legacy 106-dim observation space."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.sim.dt = 1.0 / 60.0
+        self.decimation = 12
+        self.sim.render_interval = 1
+
+        self.sim.physx.bounce_threshold_velocity = 0.2
+        self.sim.physx.gpu_found_lost_aggregate_pairs_capacity = 1024 * 256
+        self.sim.physx.gpu_total_aggregate_pairs_capacity = 1024 * 256
+
+        self.scene.robot = _make_lynx_ball_in_cup_cfg(string_num_segments=12)
 
         self.actions.arm_action = mdp.RelativeJointPositionActionCfg(
             asset_name="robot",

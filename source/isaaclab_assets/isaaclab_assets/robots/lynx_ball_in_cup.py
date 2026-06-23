@@ -20,6 +20,7 @@ class LynxBallInCupRobotCfg(LynxRobotCfg):
     ball_radius: float = 0.02
     string_length: float = 0.4
     string_radius: float = 0.0005
+    string_num_segments: int = 10  # legacy 106-dim checkpoints used 12
 
 class LynxBallInCupConstructor(LynxUsdConstructor):
     """Constructor for the Lynx robot with a ball and a cup."""
@@ -140,7 +141,7 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
         )
 
         # 2) Multi-segment String
-        num_segments = 10
+        num_segments = getattr(self.cfg, "string_num_segments", 10)
         segment_length = self.cfg.string_length / num_segments
         segment_radius = self.cfg.string_radius
         segment_mass = 0.0005

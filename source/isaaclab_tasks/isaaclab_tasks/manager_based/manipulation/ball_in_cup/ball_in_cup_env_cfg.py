@@ -75,7 +75,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         # robot proprioception
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)  # 6-dim
         # joint_vel = ObsTerm(func=mdp.joint_vel_rel)
 
         # task-centric geometric features
@@ -89,6 +89,41 @@ class ObservationsCfg:
         )
 
         # previous action helps with smoothness under low-rate control
+        last_action = ObsTerm(func=mdp.last_action)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    policy: PolicyCfg = PolicyCfg()
+
+
+@configclass
+class ObservationsCfg_V0Legacy:
+    """Legacy 106-dim observation layout used by the earliest ball-in-a-cup PPO checkpoint.
+
+    Layout (pre commit 56783a8b, before the "optimize speed" obs slimming):
+    - joint_pos_rel        : 45
+    - joint_vel_rel        : 45
+    - cup_ball_features    : 10  (full version with v_parallel)
+    - last_action          :  6
+    - total                : 106
+    """
+
+    @configclass
+    class PolicyCfg(ObsGroup):
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+        cup_ball_features = ObsTerm(
+            func=mdp.cup_ball_features,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "cup_cfg": SceneEntityCfg("robot", body_names=["cup"]),
+                "ball_cfg": SceneEntityCfg("robot", body_names=["ball"]),
+            },
+        )
+
         last_action = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
@@ -439,6 +474,33 @@ class BallInCupEnvCfg_V2(BallInCupEnvCfg):
 @configclass
 class BallInCupEnvCfg_V2_PLAY(BallInCupEnvCfg_V2):
     """Play configuration for the ball-in-a-cup task."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 8
+        self.scene.env_spacing = 2.5
+        self.observations.policy.enable_corruption = False
+        self.sim.render_interval = 1
+
+
+@configclass
+class BallInCupEnvCfg_V0Legacy(BallInCupEnvCfg):
+    """Legacy ball-in-a-cup config exposing the original 106-dim observation space.
+
+    Matches the earliest checkpoints (pre-commit 56783a8b) so those policies can be
+    loaded and visualized without re-training. Everything else (rewards, events,
+    sim settings) follows V0.
+    """
+
+    observations: ObservationsCfg_V0Legacy = ObservationsCfg_V0Legacy()
+
+    def __post_init__(self):
+        super().__post_init__()
+
+
+@configclass
+class BallInCupEnvCfg_V0Legacy_PLAY(BallInCupEnvCfg_V0Legacy):
+    """Play configuration for the legacy 106-dim ball-in-a-cup task."""
 
     def __post_init__(self):
         super().__post_init__()

@@ -65,6 +65,8 @@ python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Push-Cube-Lynx-ObsDelay-v0 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-23_15-10-11 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_push/2026-03-23_15-10-11/model_1999.pt
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v0 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-23_23-10-54 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-23_23-10-54/model_500.pt
+# the first model: use 106-dim obs
+python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-V0Legacy --num_envs 16 --load_run /home/zuxinrui/IsaacLab-2.0/logs/rsl_rl/lynx_ball_in_cup/2026-03-19_16-15-54 --checkpoint /home/zuxinrui/IsaacLab-2.0/logs/rsl_rl/lynx_ball_in_cup/2026-03-19_16-15-54/model_400.pt --device cuda:0
 
 python scripts/reinforcement_learning/rsl_rl/play.py --task=Isaac-Ball-In-Cup-Lynx-Play-v1 --num_envs 16 --load_run /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-20_01-52-04 --checkpoint /home/zuxinrui/IsaacLab/logs/rsl_rl/lynx_ball_in_cup/2026-03-20_01-52-04/model_550.pt
 
