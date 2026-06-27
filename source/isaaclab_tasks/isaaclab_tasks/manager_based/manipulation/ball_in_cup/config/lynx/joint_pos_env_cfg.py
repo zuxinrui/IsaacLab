@@ -29,31 +29,66 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
     reproduce the legacy geometry that the pre-56783a8b 106-dim checkpoints were
     trained against (those checkpoints expect 45 joint DOFs: 6 arm + 12*3 string
     spherical + 3 ball spherical).
+
+    2026-06-27 (path-1 morph swap): if `$LYNX_MORPH_YAML` points at a yaml
+    file shaped like MorphBench's `models/morphbench20/morphologies/morph_*.yaml`
+    (top-level key MorphConfig.robot_description_dict), its values override the
+    hard-coded defaults below. Unset / non-existent → ancient default geometry
+    (cup_radius=0.05, cup_height=0.08, ball_radius=0.02, 10-segment 0.4 m rope).
+    Only the robot-cfg-level fields are read from yaml; reward thresholds,
+    physics, etc. stay at the ancient values that converged model_400.pt.
     """
+    import os, yaml  # local import — no extra module-load cost for ancient default
+    overrides: dict = {}
+    yaml_path = os.environ.get("LYNX_MORPH_YAML") or os.environ.get(
+        "LYNX_MORPH_YAML_BALL_IN_CUP"
+    )
+    if yaml_path and os.path.isfile(yaml_path):
+        with open(yaml_path) as _f:
+            _y = yaml.safe_load(_f) or {}
+        # MorphBench yaml has top-level "MorphConfig.robot_description_dict";
+        # tolerate flat dicts too (test fixtures).
+        _root = _y.get("MorphConfig", _y)
+        overrides = _root.get("robot_description_dict", _root) or {}
+        # tuples in the Cfg are written as lists in yaml — re-tupleify so
+        # dataclass equality + downstream consumers stay happy.
+        for _k in ("l1_end_point_pos", "l2_end_point_pos", "l3_end_point_pos",
+                   "l4_end_point_pos", "l5_end_point_pos"):
+            if _k in overrides and isinstance(overrides[_k], list):
+                overrides[_k] = tuple(overrides[_k])
+        print(f"[ball_in_cup] morph overrides from {yaml_path}: "
+              f"{sorted(overrides)}")
+
+    def _ov(key, default):
+        return overrides.get(key, default)
+
     robot_cfg = LynxBallInCupRobotCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
-        num_joints=6,
-        genotype_tube=[0, 1, 0, 1, 0],
-        genotype_joints=1,
-        rotation_angles=[180.0, 0.0, 0.0, -180.0, 0.0, 90.0],
-        l1_end_point_pos=(0.0, 0.0, 0.2),
-        l1_end_point_theta=0.0,
-        l2_end_point_pos=(0.0, 0.0, 0.2805),
-        l2_end_point_theta=0.0,
-        l3_end_point_pos=(0.0, 0.0, 0.2),
-        l3_end_point_theta=0.0,
-        l4_end_point_pos=(0.0, 0.0, 0.2805),
-        l4_end_point_theta=0.0,
-        l5_end_point_pos=(0.0, 0.0, 0.2),
-        l5_end_point_theta=0.0,
-        cup_radius=0.05,
-        cup_height=0.08,
-        ball_radius=0.02,
-        string_length=0.4,
-        string_radius=0.0005,
-        string_num_segments=string_num_segments,
-        joint_velocity_limit_rad_s=1.7453292519943295,  # 100 deg/s
-        joint_acceleration_limit_rad_s2=1.7453292519943295,  # 100 deg/s^2
+        num_joints=_ov("num_joints", 6),
+        genotype_tube=_ov("genotype_tube", [0, 1, 0, 1, 0]),
+        genotype_joints=_ov("genotype_joints", 1),
+        rotation_angles=_ov("rotation_angles",
+                            [180.0, 0.0, 0.0, -180.0, 0.0, 90.0]),
+        l1_end_point_pos=_ov("l1_end_point_pos", (0.0, 0.0, 0.2)),
+        l1_end_point_theta=_ov("l1_end_point_theta", 0.0),
+        l2_end_point_pos=_ov("l2_end_point_pos", (0.0, 0.0, 0.2805)),
+        l2_end_point_theta=_ov("l2_end_point_theta", 0.0),
+        l3_end_point_pos=_ov("l3_end_point_pos", (0.0, 0.0, 0.2)),
+        l3_end_point_theta=_ov("l3_end_point_theta", 0.0),
+        l4_end_point_pos=_ov("l4_end_point_pos", (0.0, 0.0, 0.2805)),
+        l4_end_point_theta=_ov("l4_end_point_theta", 0.0),
+        l5_end_point_pos=_ov("l5_end_point_pos", (0.0, 0.0, 0.2)),
+        l5_end_point_theta=_ov("l5_end_point_theta", 0.0),
+        cup_radius=_ov("cup_radius", 0.05),
+        cup_height=_ov("cup_height", 0.08),
+        ball_radius=_ov("ball_radius", 0.02),
+        string_length=_ov("string_length", 0.4),
+        string_radius=_ov("string_radius", 0.0005),
+        string_num_segments=_ov("string_num_segments", string_num_segments),
+        joint_velocity_limit_rad_s=_ov("joint_velocity_limit_rad_s",
+                                       1.7453292519943295),
+        joint_acceleration_limit_rad_s2=_ov("joint_acceleration_limit_rad_s2",
+                                            1.7453292519943295),
     )
 
     robot_cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(
