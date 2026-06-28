@@ -56,8 +56,31 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
                    "l4_end_point_pos", "l5_end_point_pos"):
             if _k in overrides and isinstance(overrides[_k], list):
                 overrides[_k] = tuple(overrides[_k])
+        # MorphBench encodes `genotype_joints` as a per-link list (e.g.
+        # [1,0,0,0,0] = 1 joint active at link-1), while ancient
+        # LynxBallInCupRobotCfg expects a scalar int (the active-joint count).
+        # Bridge by summing the per-link 1s — matches the semantics morph_012
+        # (1 active joint) / morph_015 (2 active) / morph_018 (2 active).
+        if isinstance(overrides.get("genotype_joints"), list):
+            overrides["genotype_joints"] = int(sum(overrides["genotype_joints"]))
+        # Same schema drift: drop any keys the ancient Cfg doesn't accept.
+        # (Add to this set if a future yaml introduces another MorphBench-
+        # only key that doesn't map onto an ancient field.)
+        _ANCIENT_ACCEPTED = {
+            "num_joints", "genotype_tube", "genotype_joints", "rotation_angles",
+            "l1_end_point_pos", "l1_end_point_theta",
+            "l2_end_point_pos", "l2_end_point_theta",
+            "l3_end_point_pos", "l3_end_point_theta",
+            "l4_end_point_pos", "l4_end_point_theta",
+            "l5_end_point_pos", "l5_end_point_theta",
+            "cup_radius", "cup_height", "ball_radius",
+            "string_length", "string_radius", "string_num_segments",
+            "joint_velocity_limit_rad_s", "joint_acceleration_limit_rad_s2",
+        }
+        dropped = sorted(k for k in overrides if k not in _ANCIENT_ACCEPTED)
+        overrides = {k: v for k, v in overrides.items() if k in _ANCIENT_ACCEPTED}
         print(f"[ball_in_cup] morph overrides from {yaml_path}: "
-              f"{sorted(overrides)}")
+              f"applied={sorted(overrides)}  dropped={dropped}")
 
     def _ov(key, default):
         return overrides.get(key, default)
