@@ -61,12 +61,21 @@ def spawn_preview_surface(prim_path: str, cfg: visual_materials_cfg.PreviewSurfa
         # handle scene creation on a custom stage.
         material_prim = UsdShade.Material.Define(stage, prim_path)
         if material_prim:
-            shader_prim = CreateShaderPrimFromSdrCommand(
-                parent_path=prim_path,
-                identifier="UsdPreviewSurface",
-                stage_or_context=stage,
-                name="Shader",
-            ).do()
+            # 5.1 SIF uses `name=`, 6.0 SIF renamed to `prim_name=`. Try both.
+            try:
+                shader_prim = CreateShaderPrimFromSdrCommand(
+                    parent_path=prim_path,
+                    identifier="UsdPreviewSurface",
+                    stage_or_context=stage,
+                    name="Shader",
+                ).do()
+            except TypeError:
+                shader_prim = CreateShaderPrimFromSdrCommand(
+                    parent_path=prim_path,
+                    identifier="UsdPreviewSurface",
+                    stage_or_context=stage,
+                    prim_name="Shader",
+                ).do()
             # bind the shader graph to the material
             if shader_prim:
                 surface_out = shader_prim.GetOutput("surface")

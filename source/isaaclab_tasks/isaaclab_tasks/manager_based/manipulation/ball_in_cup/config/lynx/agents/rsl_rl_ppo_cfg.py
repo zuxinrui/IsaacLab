@@ -12,7 +12,10 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 class BallInCupPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 2000
-    save_interval = 500
+    # 2026-07-03: save every 50 iter (was 500) per user directive — ensures
+    # frequent checkpoints so morph_010-style catch events (R>=15 around iter 440)
+    # aren't lost when a job hits walltime before the next 500-iter multiple.
+    save_interval = 50
     experiment_name = "lynx_ball_in_cup"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,

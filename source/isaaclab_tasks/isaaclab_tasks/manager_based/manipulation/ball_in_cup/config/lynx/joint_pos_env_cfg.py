@@ -192,6 +192,33 @@ class LynxBallInCupEnvCfg(BallInCupEnvCfg):
             clip={".*": (-1.0, 1.0)},
         )
 
+        # Optional render camera — enabled via BIC_ENABLE_RENDER_CAM=1 env var.
+        # Adds a side-view CameraCfg inside __post_init__ so the render product
+        # is properly initialized at env creation (mirrors MorphBench's proven
+        # pattern in lynx/rl/ball_in_cup/env_isaac/config/lynx/joint_pos_env_cfg.py).
+        # Skipped in training runs (env var unset) so no impact on morphpack.
+        import os as _os
+        if _os.environ.get("BIC_ENABLE_RENDER_CAM"):
+            from isaaclab.sensors import CameraCfg
+            self.scene.view_1 = CameraCfg(
+                prim_path="{ENV_REGEX_NS}/view_1",
+                update_period=0.0,
+                height=96,
+                width=96,
+                data_types=["rgb"],
+                spawn=sim_utils.PinholeCameraCfg(
+                    focal_length=24.0,
+                    focus_distance=400.0,
+                    horizontal_aperture=18.428,       # MorphBench: vfov=42° at 96×96
+                    clipping_range=(0.01, 10.0),
+                ),
+                offset=CameraCfg.OffsetCfg(
+                    pos=(2.0, 0.0, 0.382),            # az=-180 el=0 dist=2 lookat=(0,0,1) +Z_offset
+                    rot=(0.5, 0.5, 0.5, 0.5),         # quat_xyzw for OpenGL camera
+                    convention="opengl",
+                ),
+            )
+
 
 @configclass
 class LynxBallInCupEnvCfg_PLAY(BallInCupEnvCfg_PLAY):
