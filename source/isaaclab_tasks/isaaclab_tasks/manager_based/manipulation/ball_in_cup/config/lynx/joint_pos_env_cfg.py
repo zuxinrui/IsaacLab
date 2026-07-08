@@ -82,6 +82,42 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
         print(f"[ball_in_cup] morph overrides from {yaml_path}: "
               f"applied={sorted(overrides)}  dropped={dropped}")
 
+    # 2026-07-08 (path-2 morph-swap fix): per-morph home joint pose from
+    # bic_home_joint_pos_deg in the sibling index.csv. Without this, ALL mb20
+    # morphs start at all-zeros → cup starts at wrong orientation for most →
+    # RL cannot discover catch behaviour (only 4/20 morphs caught in the
+    # 2026-07-06 sweep because they happened to be near-vertical at zeros).
+    # Mirrors the MB-native env_isaac wiring (docs/2026-06-16_ball_in_cup_
+    # per_morph_home_pose.md L57-70), inlined here so the IsaacLab container
+    # doesn't need MorphBench python on its path.
+    per_morph_home_deg = None
+    if yaml_path and os.path.isfile(yaml_path):
+        import csv as _csv, ast as _ast
+        index_csv = os.path.join(os.path.dirname(yaml_path), "index.csv")
+        if os.path.isfile(index_csv):
+            target_real = os.path.realpath(yaml_path)
+            target_base = os.path.basename(yaml_path)
+            try:
+                with open(index_csv, newline="") as _f:
+                    for _row in _csv.DictReader(_f):
+                        _home = (_row.get("bic_home_joint_pos_deg") or "").strip()
+                        _my = (_row.get("morph_yaml") or "").strip()
+                        if not _home or not _my:
+                            continue
+                        # Match on realpath (rare) or basename (mb20 index.csv
+                        # stores an alien absolute path; basename is stable).
+                        if os.path.realpath(_my) == target_real or \
+                           os.path.basename(_my) == target_base:
+                            try:
+                                per_morph_home_deg = list(_ast.literal_eval(_home))
+                                print(f"[ball_in_cup] per-morph home from {index_csv}: "
+                                      f"{per_morph_home_deg} deg")
+                            except (ValueError, SyntaxError):
+                                pass
+                            break
+            except (OSError, _csv.Error):
+                pass
+
     def _ov(key, default):
         return overrides.get(key, default)
 
@@ -113,6 +149,27 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
         joint_acceleration_limit_rad_s2=_ov("joint_acceleration_limit_rad_s2",
                                             1.7453292519943295),
     )
+
+    # Apply per-morph home pose loaded above. LynxRobotCfg.__post_init__
+    # already filtered init_state.joint_pos by num_joints, so we set a fresh
+    # dict (only joints 1..num_joints) with the per-morph radians. This is
+    # the reset target that reset_joints_by_scale randomises around AND the
+    # frozen-joint locks — the authoritative arm spawn pose.
+    if per_morph_home_deg is not None:
+        import math as _math
+        from isaaclab.assets import ArticulationCfg as _ArticulationCfg
+        _nj = robot_cfg.num_joints
+        if len(per_morph_home_deg) < _nj:
+            print(f"[ball_in_cup] WARN: per_morph_home_deg has {len(per_morph_home_deg)} "
+                  f"values but num_joints={_nj}; pad-with-zeros to length {_nj}.")
+            per_morph_home_deg = list(per_morph_home_deg) + [0.0] * (_nj - len(per_morph_home_deg))
+        robot_cfg.init_state = _ArticulationCfg.InitialStateCfg(
+            joint_pos={
+                f"joint_{i+1}": float(_math.radians(deg))
+                for i, deg in enumerate(per_morph_home_deg[:_nj])
+            },
+        )
+        print(f"[ball_in_cup] init_state.joint_pos (rad): {robot_cfg.init_state.joint_pos}")
 
     robot_cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(
         enabled_self_collisions=True,
