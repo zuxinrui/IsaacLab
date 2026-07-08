@@ -138,10 +138,16 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
         l4_end_point_theta=_ov("l4_end_point_theta", 0.0),
         l5_end_point_pos=_ov("l5_end_point_pos", (0.0, 0.0, 0.2)),
         l5_end_point_theta=_ov("l5_end_point_theta", 0.0),
-        cup_radius=_ov("cup_radius", 0.05),
-        cup_height=_ov("cup_height", 0.08),
-        ball_radius=_ov("ball_radius", 0.02),
-        string_length=_ov("string_length", 0.4),
+        # 2026-07-08 (user directive): cup/ball/rope fallback defaults track
+        # MorphBench/configs/sim_ball_in_cup.yaml::MorphConfig.ball_in_cup_dict,
+        # which is the single-source-of-truth for BIC geometry. Historical
+        # V0Legacy values (cup_r=0.05, cup_h=0.08, ball_r=0.02) still live
+        # in the LynxBallInCupRobotCfg class defaults for any caller that
+        # bypasses this helper; MorphBench-driven training goes through here.
+        cup_radius=_ov("cup_radius", 0.07),
+        cup_height=_ov("cup_height", 0.12),
+        ball_radius=_ov("ball_radius", 0.025),
+        string_length=_ov("string_length", 0.40),
         string_radius=_ov("string_radius", 0.0005),
         string_num_segments=_ov("string_num_segments", string_num_segments),
         joint_velocity_limit_rad_s=_ov("joint_velocity_limit_rad_s",

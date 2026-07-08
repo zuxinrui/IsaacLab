@@ -111,6 +111,51 @@ def undesired_robot_contacts(
     return undesired_contact_mask.float()
 
 
+def rope_arm_contact_penalty(
+    env: ManagerBasedRLEnv,
+    threshold: float = 0.05,
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("rope_arm_contact"),
+) -> torch.Tensor:
+    """Penalize contacts between rope segments and the arm.
+
+    Added 2026-07-08 (user directive): the 2026-07-06 sweep found only
+    morph_010 truly caught the ball on the fly; morph_005_v2 / 016_v2 / 017
+    all achieved R>15 by wrapping the rope around the arm — the rope-arm
+    entanglement then deposits the ball into the cup as a side effect. This
+    is off-task behaviour; adding a penalty on rope-arm contacts discourages
+    it and forces policies to learn genuine cup-catch dynamics.
+
+    The scene must expose a `rope_arm_contact` ContactSensor whose
+    `prim_path` covers every rope segment
+    (``{ENV_REGEX_NS}/Robot/string_seg_.*``) and whose
+    `filter_prim_paths_expr` covers the arm links + end-effector cylinder
+    (``{ENV_REGEX_NS}/Robot/link_.*`` and ``{ENV_REGEX_NS}/Robot/ee_cylinder``).
+    Under those filters, `net_forces_w[b]` at rope body b already excludes
+    rope-rope internal tension — only rope↔arm forces contribute.
+
+    Args:
+        env: ManagerBasedRLEnv instance.
+        threshold: Minimum per-segment contact-force magnitude (Newtons)
+            to count as a wrap event. Small (~0.05) so light brushing is
+            ignored but sustained wrap tension counts.
+        sensor_cfg: SceneEntityCfg pointing at the rope_arm_contact sensor.
+
+    Returns:
+        (num_envs,) float tensor. Value = number of rope segments touching
+        the arm ABOVE `threshold` at this step, i.e. an integer count in
+        [0, num_string_segments]. Multiply by a NEGATIVE weight to convert
+        to a penalty. A weight of about -0.05 to -0.2 keeps this small
+        relative to the +2.0 catch reward.
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    forces = contact_sensor.data.net_forces_w  # (num_envs, num_rope_bodies, 3)
+    if forces is None or forces.numel() == 0:
+        return torch.zeros(env.num_envs, device=contact_sensor.device)
+    mag = torch.norm(forces, dim=-1)  # (num_envs, num_rope_bodies)
+    n_touching = (mag > threshold).float().sum(dim=-1)  # (num_envs,)
+    return n_touching
+
+
 def _resolve_body_name(body_cfg: SceneEntityCfg, fallback: str) -> str:
     if isinstance(body_cfg.body_names, list) and len(body_cfg.body_names) > 0:
         return body_cfg.body_names[0]

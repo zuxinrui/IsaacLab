@@ -28,7 +28,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
-# from isaaclab.sensors import ContactSensorCfg
+from isaaclab.sensors import ContactSensorCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 
@@ -41,13 +41,23 @@ class BallInCupSceneCfg(InteractiveSceneCfg):
 
     robot: ArticulationCfg = MISSING  # type: ignore[assignment]
 
-    # contact_forces = ContactSensorCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/.*",
-    #     update_period=0.0,
-    #     history_length=3,
-    #     debug_vis=False,
-    #     filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"],
-    # )
+    # 2026-07-08: rope↔arm contact sensor. `prim_path` targets every rope
+    # segment; `filter_prim_paths_expr` restricts recorded net_forces to
+    # only forces from arm-link / EE-cylinder contacts (rope-rope tension
+    # is excluded — that IS the whole point). Consumed by
+    # RewardsCfg.rope_arm_contact via mdp.rope_arm_contact_penalty to
+    # discourage wrap-the-rope-around-the-arm catch strategies that the
+    # 2026-07-06 sweep found for 3/4 successful morphs.
+    rope_arm_contact = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/string_seg_.*",
+        update_period=0.0,
+        history_length=1,
+        debug_vis=False,
+        filter_prim_paths_expr=[
+            "{ENV_REGEX_NS}/Robot/link_.*",
+            "{ENV_REGEX_NS}/Robot/ee_cylinder",
+        ],
+    )
 
     plane = AssetBaseCfg(
         prim_path="/World/GroundPlane",
@@ -304,6 +314,21 @@ class RewardsCfg:
 
     # Penalty: Action magnitude
     action_magnitude = RewTerm(func=mdp.regularization_penalty, weight=0.0001)
+
+    # Penalty: Rope↔arm contact (2026-07-08 user directive). Discourages
+    # wrap-the-rope-around-the-arm catch strategies. Weight is env-var
+    # tunable so ancient-repro runs can disable via
+    # `BIC_ROPE_ARM_CONTACT_WEIGHT=0`. Default -0.1 · per-segment-in-contact
+    # / step ≈ -0.5 when 5 segments wrap, small vs +2.0 catch reward but
+    # sustained wrap accumulates over the 300-step episode.
+    rope_arm_contact = RewTerm(
+        func=mdp.rope_arm_contact_penalty,
+        weight=float(__import__("os").environ.get("BIC_ROPE_ARM_CONTACT_WEIGHT", "-0.1")),
+        params={
+            "threshold": float(__import__("os").environ.get("BIC_ROPE_ARM_CONTACT_THRESHOLD", "0.05")),
+            "sensor_cfg": SceneEntityCfg("rope_arm_contact"),
+        },
+    )
 
     # Penalty: Joint height
     # joint_height_penalty = RewTerm(
