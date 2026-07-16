@@ -312,16 +312,73 @@ class LynxBallInCupEnvCfg_PLAY(BallInCupEnvCfg_PLAY):
         self.scene.rope_arm_contact = None
         self.rewards.rope_arm_contact = None
 
-        # Performance-oriented simulation setup for play/inference:
-        # keep 5Hz control while reducing expensive physics sub-steps.
+        # Keep physics/rendering at 60 Hz while querying the policy at 5 Hz.
+        # The RSL-RL play loop repeats each policy action `action_repeat`
+        # times. This is dynamically equivalent to decimation=12, but exposes
+        # every physics frame to the GUI/video recorder instead of producing a
+        # visibly jerky 5 fps recording.
         self.sim.dt = 1.0 / 60.0
-        self.decimation = 12
+        self.decimation = 1
+        self.action_repeat = 12
         self.sim.render_interval = 1
 
         # Keep a single playback environment large enough to inspect the
         # ball/cup/rope interaction in both the GUI and recorded videos.
         self.viewer.eye = (2.2, 2.2, 1.8)
         self.viewer.lookat = (0.0, 0.0, 0.8)
+
+        # Video uses a dedicated camera prim rather than the default Isaac
+        # viewport. The pose is MuJoCo BIC `view_1` exactly:
+        #   azimuth=-180, elevation=0, lookat=(0, 0, 1.0), distance=2.0.
+        # MuJoCo's table top is z=0.61801 while IsaacLab's is z=0, hence the
+        # shared -0.61801 z translation. Distance is overridable for framing,
+        # but azimuth/elevation/lookat remain fixed.
+        import math as _math
+        import os as _os
+        if _os.environ.get("BIC_ENABLE_RENDER_CAM"):
+            from isaaclab.sensors import CameraCfg
+
+            _width = int(_os.environ.get("BIC_RENDER_WIDTH", "1280"))
+            _height = int(_os.environ.get("BIC_RENDER_HEIGHT", "720"))
+            _distance = float(_os.environ.get("BIC_RENDER_CAMERA_DISTANCE", "2.0"))
+            _base_height = float(_os.environ.get("BIC_BASE_HEIGHT", "0.0"))
+            _lookat_z = 1.0 - 0.61801 + _base_height
+            _focal_length = 24.0
+            _vfov_deg = 42.0
+            _horizontal_aperture = (
+                2.0
+                * _focal_length
+                * _math.tan(_math.radians(_vfov_deg) / 2.0)
+                * (_width / _height)
+            )
+            self.scene.view_1 = CameraCfg(
+                prim_path="{ENV_REGEX_NS}/view_1",
+                update_period=0.0,
+                # The Camera sensor only supplies the prim. Gym's rgb_array
+                # render product below records it at the full output size.
+                height=90,
+                width=160,
+                data_types=["rgb"],
+                spawn=sim_utils.PinholeCameraCfg(
+                    focal_length=_focal_length,
+                    focus_distance=400.0,
+                    horizontal_aperture=_horizontal_aperture,
+                    clipping_range=(0.01, 10.0),
+                ),
+                offset=CameraCfg.OffsetCfg(
+                    pos=(_distance, 0.0, _lookat_z),
+                    rot=(0.5, 0.5, 0.5, 0.5),
+                    convention="opengl",
+                ),
+            )
+            self.viewer.cam_prim_path = "/World/envs/env_0/view_1"
+            self.viewer.resolution = (_width, _height)
+            print(
+                "[ball_in_cup] render camera view_1: "
+                f"az=-180 el=0 distance={_distance} "
+                f"lookat_isaac=(0,0,{_lookat_z:.5f}) "
+                f"vfov={_vfov_deg} resolution={_width}x{_height}"
+            )
 
         # Relax global solver settings for throughput (sufficient for push task stability).
         self.sim.physx.bounce_threshold_velocity = 0.2

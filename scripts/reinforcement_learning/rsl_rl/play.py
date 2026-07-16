@@ -18,8 +18,8 @@ import cli_args  # isort: skip
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
-parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
-parser.add_argument("--max_steps", type=int, default=None, help="Stop after this many environment steps.")
+parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (render frames).")
+parser.add_argument("--max_steps", type=int, default=None, help="Stop after this many policy steps.")
 parser.add_argument(
     "--report_episode_metrics",
     action="store_true",
@@ -201,41 +201,56 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         export_policy_as_onnx(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.onnx")
 
     dt = env.unwrapped.step_dt
+    action_repeat = max(int(getattr(env.unwrapped.cfg, "action_repeat", 1)), 1)
+    control_dt = dt * action_repeat
+    if action_repeat > 1:
+        print(
+            f"[INFO] Playback action repeat: {action_repeat} env steps per policy step "
+            f"(render={1.0 / dt:.1f} Hz, policy={1.0 / control_dt:.1f} Hz)"
+        )
 
     # reset environment
     obs = env.get_observations()
-    timestep = 0
+    policy_timestep = 0
+    video_timestep = 0
+    stop_requested = False
     # simulate environment
-    while simulation_app.is_running():
+    while simulation_app.is_running() and not stop_requested:
         start_time = time.time()
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
-            # env stepping
-            obs, _, dones, extras = env.step(actions)
-            # reset recurrent states for episodes that have terminated
-            if version.parse(installed_version) >= version.parse("4.0.0"):
-                policy.reset(dones)
-            else:
-                policy_nn.reset(dones)
-        timestep += 1
-        if args_cli.report_episode_metrics and torch.any(dones):
-            episode_metrics = {
-                key: float(value.item()) if hasattr(value, "item") else value
-                for key, value in extras.get("log", {}).items()
-                if key.startswith("Episode_")
-            }
-            print(f"[play][episode step={timestep}] {episode_metrics}")
-        if args_cli.video:
-            # Exit the play loop after recording one video
-            if timestep == args_cli.video_length:
-                break
-        if args_cli.max_steps is not None and timestep >= args_cli.max_steps:
+            for _ in range(action_repeat):
+                # Repeat a policy action at the environment physics/render
+                # cadence. Play configs can therefore keep policy inference
+                # at 5 Hz while GUI/video frames remain smooth at 60 Hz.
+                obs, _, dones, extras = env.step(actions)
+                video_timestep += 1
+                # reset recurrent states for episodes that have terminated
+                if version.parse(installed_version) >= version.parse("4.0.0"):
+                    policy.reset(dones)
+                else:
+                    policy_nn.reset(dones)
+                if args_cli.report_episode_metrics and torch.any(dones):
+                    episode_metrics = {
+                        key: float(value.item()) if hasattr(value, "item") else value
+                        for key, value in extras.get("log", {}).items()
+                        if key.startswith("Episode_")
+                    }
+                    print(f"[play][episode policy_step={policy_timestep + 1}] {episode_metrics}")
+                if args_cli.video and video_timestep >= args_cli.video_length:
+                    stop_requested = True
+                    break
+                # Do not apply a stale pre-reset action to a new episode.
+                if torch.any(dones):
+                    break
+        policy_timestep += 1
+        if args_cli.max_steps is not None and policy_timestep >= args_cli.max_steps:
             break
 
         # time delay for real-time evaluation
-        sleep_time = dt - (time.time() - start_time)
+        sleep_time = control_dt - (time.time() - start_time)
         if args_cli.real_time and sleep_time > 0:
             time.sleep(sleep_time)
 
