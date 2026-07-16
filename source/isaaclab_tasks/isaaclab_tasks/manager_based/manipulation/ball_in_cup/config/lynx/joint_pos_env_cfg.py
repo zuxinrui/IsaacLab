@@ -304,6 +304,14 @@ class LynxBallInCupEnvCfg_PLAY(BallInCupEnvCfg_PLAY):
     def __post_init__(self):
         super().__post_init__()
 
+        # The rope-arm contact sensor is only used by a training reward. Its
+        # many-rope-to-many-link filter cannot be represented by the PhysX
+        # contact tensor API and can block GUI startup with an
+        # "expected 10, found 6" filter error. Playback does not consume
+        # training rewards, so omit both the sensor and its reward term.
+        self.scene.rope_arm_contact = None
+        self.rewards.rope_arm_contact = None
+
         # Performance-oriented simulation setup for play/inference:
         # keep 5Hz control while reducing expensive physics sub-steps.
         self.sim.dt = 1.0 / 60.0
