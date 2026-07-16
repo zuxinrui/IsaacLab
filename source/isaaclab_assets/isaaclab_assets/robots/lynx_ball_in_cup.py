@@ -21,6 +21,13 @@ class LynxBallInCupRobotCfg(LynxRobotCfg):
     string_length: float = 0.4
     string_radius: float = 0.0005
     string_num_segments: int = 10  # legacy 106-dim checkpoints used 12
+    # Keep the IsaacLab cup visually aligned with the MuJoCo CupModuleV4
+    # setup in LynxRobotics-Lite/configs/sim_ball_in_cup.yaml.
+    cup_color: tuple = (0.7, 0.7, 0.7)
+    cup_roughness: float = 0.2
+    cup_opacity: float = 0.1
+    ball_color: tuple = (0.8, 0.2, 0.2)
+    string_color: tuple = (1.0, 1.0, 1.0)
 
 class LynxBallInCupConstructor(LynxUsdConstructor):
     """Constructor for the Lynx robot with a ball and a cup."""
@@ -44,13 +51,27 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
         ee_cyl_path = f"{root_path}/ee_cylinder"
         ee_cyl_length = 0.07
 
-        cup_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
-            diffuse_color=(0.25, 0.38, 0.48),
-            # metallic=1.0,
-            roughness=0.7,
+        cup_base_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=tuple(self.cfg.cup_color),
+            roughness=float(self.cfg.cup_roughness),
+            opacity=float(self.cfg.cup_opacity),
         )
-        white_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 1.0))
-        red_material = sim_utils.spawners.materials.PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2))
+        cup_wall_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=tuple(self.cfg.cup_color),
+            roughness=float(self.cfg.cup_roughness),
+            opacity=max(0.05, min(1.0, float(self.cfg.cup_opacity) * 0.7)),
+        )
+        basket_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=(0.0, 0.0, 0.0),
+            roughness=0.6,
+            opacity=1.0,
+        )
+        white_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=tuple(self.cfg.string_color)
+        )
+        red_material = sim_utils.spawners.materials.PreviewSurfaceCfg(
+            diffuse_color=tuple(self.cfg.ball_color)
+        )
 
         # Cup geometry convention:
         # - Cup rigid-body origin is kept at the EE-side contact point.
@@ -96,7 +117,7 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
             sim_utils.spawners.MeshCylinderCfg(
                 radius=self.cfg.cup_radius,
                 height=wall_thickness,
-                visual_material=cup_material,
+                visual_material=cup_base_material,
                 physics_material=shared_physics_material,
                 collision_props=sim_utils.CollisionPropertiesCfg()
             ),
@@ -123,12 +144,56 @@ class LynxBallInCupConstructor(LynxUsdConstructor):
                 f"{cup_path}/wall_{i}",
                 sim_utils.spawners.MeshCuboidCfg(
                     size=(wall_height, wall_thickness, segment_width),
-                    visual_material=cup_material,
+                    visual_material=cup_wall_material,
                     physics_material=shared_physics_material,
                     collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=True),
                 ),
                 translation=(wall_center_x, y, z),
                 orientation=self._quat_to_tuple(seg_rot)
+            )
+
+        # Visual-only black basket outline matching MuJoCo CupModuleV4:
+        # two rings around the transparent cup and three axial rods.  These
+        # meshes deliberately omit collision and physics material properties,
+        # so the checkpoint's cup/ball dynamics remain unchanged.
+        ring_thickness = 0.003
+        rod_thickness = 0.003
+        num_ring_segments = 16
+        ring_segment_width = (
+            2 * math.pi * self.cfg.cup_radius / num_ring_segments * 0.95
+        )
+        wall_min_x = wall_center_x - wall_height / 2.0
+        wall_max_x = wall_center_x + wall_height / 2.0
+
+        for ring_label, ring_x in (("bottom", wall_min_x), ("top", wall_max_x)):
+            for i in range(num_ring_segments):
+                angle_rad = 2 * math.pi * i / num_ring_segments
+                y = self.cfg.cup_radius * math.cos(angle_rad)
+                z = self.cfg.cup_radius * math.sin(angle_rad)
+                seg_rot = Gf.Quatf(
+                    Gf.Rotation(Gf.Vec3d(1, 0, 0), math.degrees(angle_rad)).GetQuat()
+                )
+                sim_utils.spawners.meshes.spawn_mesh_cuboid(
+                    f"{cup_path}/basket_{ring_label}_ring_{i}",
+                    sim_utils.spawners.MeshCuboidCfg(
+                        size=(ring_thickness, ring_thickness, ring_segment_width),
+                        visual_material=basket_material,
+                    ),
+                    translation=(ring_x, y, z),
+                    orientation=self._quat_to_tuple(seg_rot),
+                )
+
+        for i in range(3):
+            angle_rad = 2 * math.pi * i / 3
+            y = self.cfg.cup_radius * math.cos(angle_rad)
+            z = self.cfg.cup_radius * math.sin(angle_rad)
+            sim_utils.spawners.meshes.spawn_mesh_cuboid(
+                f"{cup_path}/basket_rod_{i}",
+                sim_utils.spawners.MeshCuboidCfg(
+                    size=(wall_height, rod_thickness, rod_thickness),
+                    visual_material=basket_material,
+                ),
+                translation=(wall_center_x, y, z),
             )
 
         # Fix cup to EE tip.
