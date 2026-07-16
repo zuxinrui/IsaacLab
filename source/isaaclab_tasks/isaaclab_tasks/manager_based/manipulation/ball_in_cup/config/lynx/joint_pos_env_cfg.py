@@ -97,6 +97,11 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
         if os.path.isfile(index_csv):
             target_real = os.path.realpath(yaml_path)
             target_base = os.path.basename(yaml_path)
+            # Playback bundles use ``morph_014/morph.yaml`` while their
+            # copied index.csv retains the source basename
+            # ``morph_014.yaml``. Accept both names without requiring the
+            # bundle to rewrite either file.
+            bundle_source_base = f"{os.path.basename(os.path.dirname(os.path.abspath(yaml_path)))}.yaml"
             try:
                 with open(index_csv, newline="") as _f:
                     for _row in _csv.DictReader(_f):
@@ -107,7 +112,7 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
                         # Match on realpath (rare) or basename (mb20 index.csv
                         # stores an alien absolute path; basename is stable).
                         if os.path.realpath(_my) == target_real or \
-                           os.path.basename(_my) == target_base:
+                           os.path.basename(_my) in (target_base, bundle_source_base):
                             try:
                                 per_morph_home_deg = list(_ast.literal_eval(_home))
                                 print(f"[ball_in_cup] per-morph home from {index_csv}: "
@@ -176,6 +181,15 @@ def _make_lynx_ball_in_cup_cfg(string_num_segments: int = 10) -> LynxBallInCupRo
             },
         )
         print(f"[ball_in_cup] init_state.joint_pos (rad): {robot_cfg.init_state.joint_pos}")
+
+    # Exact playback reproduction for campaigns that lifted the complete
+    # robot/rope assembly. Unset keeps the task's historical zero-height
+    # behavior; bundle launchers can source the value from per-morph metadata.
+    base_height_text = os.environ.get("BIC_BASE_HEIGHT")
+    if base_height_text is not None:
+        base_height = float(base_height_text)
+        robot_cfg.init_state.pos = (0.0, 0.0, base_height)
+        print(f"[ball_in_cup] BIC_BASE_HEIGHT={base_height}")
 
     robot_cfg.spawn.articulation_props = sim_utils.ArticulationRootPropertiesCfg(
         enabled_self_collisions=True,
@@ -295,6 +309,11 @@ class LynxBallInCupEnvCfg_PLAY(BallInCupEnvCfg_PLAY):
         self.sim.dt = 1.0 / 60.0
         self.decimation = 12
         self.sim.render_interval = 1
+
+        # Keep a single playback environment large enough to inspect the
+        # ball/cup/rope interaction in both the GUI and recorded videos.
+        self.viewer.eye = (2.2, 2.2, 1.8)
+        self.viewer.lookat = (0.0, 0.0, 0.8)
 
         # Relax global solver settings for throughput (sufficient for push task stability).
         self.sim.physx.bounce_threshold_velocity = 0.2

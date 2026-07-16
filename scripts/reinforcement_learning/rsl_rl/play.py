@@ -19,6 +19,13 @@ import cli_args  # isort: skip
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+parser.add_argument("--max_steps", type=int, default=None, help="Stop after this many environment steps.")
+parser.add_argument(
+    "--report_episode_metrics",
+    action="store_true",
+    default=False,
+    help="Print episode metrics returned by the environment whenever an episode ends.",
+)
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
@@ -206,17 +213,26 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             # agent stepping
             actions = policy(obs)
             # env stepping
-            obs, _, dones, _ = env.step(actions)
+            obs, _, dones, extras = env.step(actions)
             # reset recurrent states for episodes that have terminated
             if version.parse(installed_version) >= version.parse("4.0.0"):
                 policy.reset(dones)
             else:
                 policy_nn.reset(dones)
+        timestep += 1
+        if args_cli.report_episode_metrics and torch.any(dones):
+            episode_metrics = {
+                key: float(value.item()) if hasattr(value, "item") else value
+                for key, value in extras.get("log", {}).items()
+                if key.startswith("Episode_")
+            }
+            print(f"[play][episode step={timestep}] {episode_metrics}")
         if args_cli.video:
-            timestep += 1
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
+        if args_cli.max_steps is not None and timestep >= args_cli.max_steps:
+            break
 
         # time delay for real-time evaluation
         sleep_time = dt - (time.time() - start_time)
