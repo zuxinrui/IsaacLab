@@ -269,13 +269,75 @@ class LynxBallInCupEnvCfg(BallInCupEnvCfg):
             clip={".*": (-1.0, 1.0)},
         )
 
+        # Batched offline-collection cameras. Keep these on the exact ancient
+        # task used to train the catch policies instead of moving policies to
+        # the physics/action-diverged modern MorphBench v0 environment.
+        #
+        # TiledCameraCfg is essential: plain CameraCfg creates one render
+        # product per environment and exhausts RTX descriptor resources at
+        # 256+ envs. Two tiled sensors create exactly two render products for
+        # the entire batch. The black-box camera poses mirror the MuJoCo BIC
+        # view_1/view_2 registry; base-height compensation keeps the framing
+        # fixed for policies trained with BIC_BASE_HEIGHT=0.5.
+        import os as _os
+        if _os.environ.get("BIC_ENABLE_COLLECTION_CAMERAS"):
+            import math as _math
+            from isaaclab.sensors import TiledCameraCfg
+
+            _native_width = int(_os.environ.get("BIC_COLLECTION_NATIVE_SIZE", "96"))
+            _native_height = int(_os.environ.get("BIC_COLLECTION_NATIVE_HEIGHT", "72"))
+            _distance = float(_os.environ.get("BIC_COLLECTION_CAMERA_DISTANCE", "1.8"))
+            _base_height = float(_os.environ.get("BIC_BASE_HEIGHT", "0.0"))
+            _lookat_z = 1.0 - 0.61801 + _base_height
+            # Keep neighbouring replicated scenes outside the camera frustum.
+            self.scene.env_spacing = max(float(self.scene.env_spacing), 4.0)
+            _view_specs = {
+                # Legacy IsaacLab CameraCfg quaternions are (w, x, y, z).
+                "view_1": (
+                    (_distance, 0.0, _lookat_z),
+                    (0.5, 0.5, 0.5, 0.5),
+                ),
+                "view_2": (
+                    (-_distance / _math.sqrt(2.0), -_distance / _math.sqrt(2.0), _lookat_z),
+                    (0.65328148, 0.65328148, -0.27059805, -0.27059805),
+                ),
+            }
+            for _view_name, (_pos, _rot) in _view_specs.items():
+                setattr(
+                    self.scene,
+                    _view_name,
+                    TiledCameraCfg(
+                        prim_path=f"{{ENV_REGEX_NS}}/{_view_name}",
+                        update_period=0.0,
+                        height=_native_height,
+                        width=_native_width,
+                        data_types=["rgb", "distance_to_image_plane"],
+                        spawn=sim_utils.PinholeCameraCfg(
+                            focal_length=24.0,
+                            focus_distance=400.0,
+                            horizontal_aperture=18.428,
+                            clipping_range=(0.01, 10.0),
+                        ),
+                        offset=TiledCameraCfg.OffsetCfg(
+                            pos=_pos,
+                            rot=_rot,
+                            convention="opengl",
+                        ),
+                    ),
+                )
+            print(
+                "[ball_in_cup] tiled collection cameras: "
+                f"views={list(_view_specs)} native={_native_width}x{_native_height}px "
+                f"distance={_distance} base_height={_base_height} "
+                f"env_spacing={self.scene.env_spacing}"
+            )
+
         # Optional render camera — enabled via BIC_ENABLE_RENDER_CAM=1 env var.
         # Adds a side-view CameraCfg inside __post_init__ so the render product
         # is properly initialized at env creation (mirrors MorphBench's proven
         # pattern in lynx/rl/ball_in_cup/env_isaac/config/lynx/joint_pos_env_cfg.py).
         # Skipped in training runs (env var unset) so no impact on morphpack.
-        import os as _os
-        if _os.environ.get("BIC_ENABLE_RENDER_CAM"):
+        elif _os.environ.get("BIC_ENABLE_RENDER_CAM"):
             from isaaclab.sensors import CameraCfg
             self.scene.view_1 = CameraCfg(
                 prim_path="{ENV_REGEX_NS}/view_1",
